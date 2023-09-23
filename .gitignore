@@ -1,0 +1,10 @@
+*.pdf
+
+.DS_Store
+
+figures/
+data/
+old/
+condition_num_while_training_NN_old_07092023/
+
+__pycache__/
