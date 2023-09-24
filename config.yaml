@@ -1,0 +1,49 @@
+###########
+# General #
+###########
+project_name: "synthetic_experiments" # baseline for synthetic experiments
+experiment_name: "effect_of_Linear_activ_func"
+max_epochs: 15000
+calc_cond_num: True # Bool to calculate second order infotmation or not
+calc_every_iter: 200 # calculate second order information every x iterations
+verbose_level: 0 
+
+#########
+# Model #
+#########
+# possible models: sequential, sequential_w_fully_skip
+model_name: 'sequential'
+hidden_layers: [1]
+width: [60]
+# possible activation functions: linear, relu, gelu, leaky_relu
+activation_func: 'linear'
+# for leaky_relu:
+neg_slope: 0.5
+# for skip connections:
+beta: 1
+seed: 314159
+
+#########
+# Data #
+#########
+# synthetic bimodal gaussian dataset for binary classification
+input_dim: 2
+data_pts_per_class_training: 100
+data_pts_per_class_validation: 100
+data_pts_per_class_testing: 100
+mean_class1: [0, 5.]
+mean_class2: [0, -5.]
+cov_class1: [[0.25,0],[0,0.25]]
+cov_class2: [[0.25,0],[0,0.25]]
+
+
+############# 
+# Optimizer #
+############# 
+loss_func: 'mse'
+# possible optims: sgd, adam
+optimizer: 'SGD'
+batch_size: 200
+lr: [0.001]
+momentum: 0
+weight_decay: 0.000
