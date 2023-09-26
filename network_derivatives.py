@@ -207,19 +207,21 @@ def calc_condition_num(network,x,y,loss):
     # calculate the outer-product Hessian, its nonzero spectrum and its condition number
     H_o, H_o_nonzero_spectrum = calc_outer_prod_hessian(network,x)
     
-    lam_abs_min_H_o = H_o_nonzero_spectrum[0]
-    lam_abs_max_H_o = H_o_nonzero_spectrum[-1]
+    lam_abs_min_H_o = np.array(H_o_nonzero_spectrum[0])
+    lam_abs_max_H_o = np.array(H_o_nonzero_spectrum[-1])
     
 #     print('H_o_rank= ', len(H_o_nonzero_spectrum))
 
-    H_o_cond = (H_o_nonzero_spectrum[-1]/H_o_nonzero_spectrum[0])
+    H_o_cond = np.array(H_o_nonzero_spectrum[-1]/H_o_nonzero_spectrum[0])
     
 #     print('H_full', H_full)
 #     print('H_o', H_o)
     
-    diff_H_H_o = torch.linalg.norm(H_full-H_o)
+    mean_diff_H_H_o = np.array((torch.norm(H_full-H_o)/H_full.shape[0]**2))
+    max_diff_H_H_o = np.array(torch.max(H_full-H_o).numpy().astype(float))
 
-    return H_cond, H_o_cond, lam_abs_min_H, lam_abs_max_H, lam_abs_min_H_o, lam_abs_max_H_o, diff_H_H_o
+
+    return H_cond, H_o_cond, lam_abs_min_H, lam_abs_max_H, lam_abs_min_H_o, lam_abs_max_H_o, mean_diff_H_H_o, max_diff_H_H_o
 
 
 

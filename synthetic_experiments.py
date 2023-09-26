@@ -8,6 +8,8 @@ from torch.utils.data import TensorDataset, DataLoader
 import time
 from IPython.display import display, Latex
 from collections import defaultdict
+import pandas as pd
+import seaborn as sns
 
 from torch.distributions.multivariate_normal import MultivariateNormal
 from datetime import datetime as dt
@@ -27,40 +29,55 @@ def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr,
     elif optimizer == 'Adam':
         opt = optim.Adam(network.parameters(), lr=lr)
     else:
-        ValueError('Unknown optimizer')
-
-    loss_values = [loss_func(network(x_train), y_train).detach()]
-    grad_norm_squared = []
+        ValueError('Unknown optimizer')    
     
 
-#     print(_H_cond, _H_o_cond, _lam_abs_min, _lam_abs_max, _diff_H_H_o)
+    training_information = pd.DataFrame({
+                                    'width':[],
+                                    'depth':[],
+                                    'activ_f':[],
+                                    'epoch':[],
+                                    'loss':[],
+                                    'grad_norm_squared':[]
+                                    })
+    
+    initial_loss = loss_func(network(x_train), y_train)
+    initial_loss.backward()
+    grad_norm_sq = sum([torch.linalg.norm(param.grad)**2 for param in network.parameters()])
+    opt.zero_grad()
+
+    training_information.loc[len(training_information)] = [network.width, network.depth, network.activation_func, 0, loss_func(network(x_train), y_train).detach(), grad_norm_sq]
     
     if calc_cond_num == True:
-        _H_cond, _H_o_cond, _lam_abs_min_H, _lam_abs_max_H, _lam_abs_min_H_o, _lam_abs_max_H_o, _diff_H_H_o = calc_condition_num(network,
+        hessian_information = pd.DataFrame({ 
+                                        'width':[],
+                                        'depth':[],
+                                        'activ_f':[],
+                                        'epoch':[],
+                                        'H_cond':[],
+                                        'H_o_cond':[],
+                                        'lam_abs_min_H':[],
+                                        'lam_abs_max_H':[],
+                                        'mean_diff_H_H_o':[],
+                                        'max_diff_H_H_o':[]
+                                        })
+ 
+    if calc_cond_num == True:
+        _H_cond, _H_o_cond, _lam_abs_min_H, _lam_abs_max_H, _lam_abs_min_H_o, _lam_abs_max_H_o, _mean_diff_H_H_o, _max_diff_H_H_o = calc_condition_num(network,
                                                                     x_train,y_train,
                                                                     loss_func)
-        H_cond = [_H_cond]
-        H_o_cond = [_H_o_cond]
-        lam_abs_min_H = [_lam_abs_min_H]
-        lam_abs_max_H = [_lam_abs_max_H]
-        lam_abs_min_H_o = [_lam_abs_min_H_o]
-        lam_abs_max_H_o = [_lam_abs_max_H_o]
-        diff_H_H_o = [_diff_H_H_o]
+        
+        hessian_information.loc[len(hessian_information)] = [network.width, network.depth, network.activation_func, 0, _H_cond, _H_o_cond, _lam_abs_min_H, _lam_abs_max_H, _mean_diff_H_H_o, _max_diff_H_H_o]
         
     print('Epoch: 0 \t loss= %10.3e' %loss_func(network(x_train), y_train).detach())
 
     for epoch in tqdm(range(epochs)):
         if calc_cond_num == True and epoch%calc_every_x_epoch==0:
-            _H_cond, _H_o_cond, _lam_abs_min_H, _lam_abs_max_H, _lam_abs_min_H_o, _lam_abs_max_H_o, _diff_H_H_o = calc_condition_num(network,
+            _H_cond, _H_o_cond, _lam_abs_min_H, _lam_abs_max_H, _lam_abs_min_H_o, _lam_abs_max_H_o, _mean_diff_H_H_o, _max_diff_H_H_o = calc_condition_num(network,
                                                                         x_train,y_train,
                                                                         loss_func)
-            H_cond.append(_H_cond)
-            H_o_cond.append(_H_o_cond)
-            lam_abs_min_H.append(_lam_abs_min_H)
-            lam_abs_max_H.append(_lam_abs_max_H)
-            lam_abs_min_H_o.append(_lam_abs_min_H_o)
-            lam_abs_max_H_o.append(_lam_abs_max_H_o)
-            diff_H_H_o.append(_diff_H_H_o)
+
+            hessian_information.loc[len(hessian_information)] = [network.width, network.depth, network.activation_func, epoch, _H_cond, _H_o_cond, _lam_abs_min_H, _lam_abs_max_H, _mean_diff_H_H_o, _max_diff_H_H_o]            
         
         for xb, yb in train_dl:
             pred = network(xb)        
@@ -69,7 +86,8 @@ def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr,
             loss.backward()
             
             grad_norm_sq = sum([torch.linalg.norm(param.grad)**2 for param in network.parameters()])
-            grad_norm_squared.append(grad_norm_sq)
+
+            training_information.loc[len(training_information)] = [network.width, network.depth, network.activation_func, epoch, loss_func(network(x_train), y_train).detach(), grad_norm_sq]
             
             opt.step()
             opt.zero_grad()
@@ -80,7 +98,7 @@ def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr,
                 print('gradient_norm_sqaured: ', grad_norm_squared)
 
         
-        loss_values.append(loss_func(network(x_train), y_train).detach())
+        
         
         if verbose_level == 0 and epoch%int(epochs/10 + 1) ==0:
             print('Epoch: %d \t loss= %10.4e' %(epoch+1, loss_func(network(x_train), y_train).detach()))
@@ -90,9 +108,9 @@ def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr,
         
     print('Epoch: %d \t loss= %10.4e' %(epoch+1, loss_func(network(x_train), y_train).detach()))
     if calc_cond_num == True:
-        return loss_values, grad_norm_squared, H_cond, H_o_cond, lam_abs_min_H, lam_abs_max_H, lam_abs_min_H_o, lam_abs_max_H_o, diff_H_H_o
+        return training_information, hessian_information
     else:
-        return loss_values, grad_norm_squared
+        return training_information
 
 def train_network_configurations(networks, x_train, y_train, train_dl, loss_func, m_L_config, epochs, lrs, optimizer='SGD', calc_cond_num=False, calc_every_x_epoch=10, verbose_level=0, seed=314159):
     '''
@@ -111,25 +129,34 @@ def train_network_configurations(networks, x_train, y_train, train_dl, loss_func
 
     # Train list of networks
 
-    grad_norm_squared = []
-    loss_values = []
-    H_conds = []
-    H_o_conds = []
-    lam_abs_mins_H = []
-    lam_abs_maxs_H = []
-    lam_abs_mins_H_o = []
-    lam_abs_maxs_H_o = []
-    diff_H_H_os = []
+    # Define DataFrames to log information about training process and Hessian information (condition number, eigenvalues etc.)
+    training_information = pd.DataFrame({
+                                    'width':[],
+                                    'depth':[],
+                                    'activ_f':[],
+                                    'epoch':[],
+                                    'loss':[],
+                                    'grad_norm_squared':[]
+                                    })
+    if calc_cond_num == True:
+        hessian_information = pd.DataFrame({ 
+                                            'width':[],
+                                            'depth':[],
+                                            'activ_f':[],
+                                            'epoch':[],
+                                            'H_cond':[],
+                                            'H_o_cond':[],
+                                            'lam_abs_min_H':[],
+                                            'lam_abs_max_H':[],
+                                            'mean_diff_H_H_o':[],
+                                            'max_diff_H_H_o':[]
+                                            })
     
-    cond_infos = defaultdict(list)
+
 
     print('Training Networks...')
 
     for ind, network in enumerate(networks):
-
-        # print('m_L[ind]:', m_L_config[ind])
-        # print('networks[0].lin_in.weight',networks[0].lin_in.weight.shape)
-        # print('networks[0].lin_out.weight',networks[0].lin_out.weight.shape)
 
         print('Network configuration: d=%d, k=%d, m=%d, L=%d' % (networks[0].lin_in.weight.shape[1], networks[0].lin_out.weight.shape[0], m_L_config[ind][0], m_L_config[ind][1]+1))
 
@@ -146,40 +173,38 @@ def train_network_configurations(networks, x_train, y_train, train_dl, loss_func
                 TypeError('Unknown format for learning rate')
         
         if calc_cond_num==False:
-            _loss_values, _grad_norm_squared = train_network(x_train, y_train, 
+            _training_information = train_network(x_train, y_train, 
                                             loss_func, network, 
                                             optimizer=optimizer, 
                                             lr=lr, epochs=epochs, 
                                             calc_cond_num=False, 
                                             verbose_level=verbose_level)
+            training_information = pd.concat([training_information, _training_information])
         else: 
-            _loss_values, _grad_norm_squared, _H_cond, _H_o_cond, _lam_abs_min_H, _lam_abs_max_H, _lam_abs_min_H_o, _lam_abs_max_H_o, _diff_H_H_o = train_network(x_train, y_train, train_dl, 
-                                                                                                        loss_func, network, 
-                                                                                                        optimizer=optimizer, 
-                                                                                                        lr=lr, epochs=epochs, 
-                                                                                                        calc_cond_num=True, 
-                                                                                                        verbose_level=verbose_level,
-                                                                                                        calc_every_x_epoch=calc_every_x_epoch)
-            cond_infos['H_conds'].append(_H_cond)
-            cond_infos['H_o_conds'].append(_H_o_cond)
-            cond_infos['lam_abs_mins_H'].append(_lam_abs_min_H)
-            cond_infos['lam_abs_maxs_H'].append(_lam_abs_max_H)
-            cond_infos['lam_abs_mins_H_o'].append(_lam_abs_min_H_o)
-            cond_infos['lam_abs_maxs_H_o'].append(_lam_abs_max_H_o)
-            cond_infos['diff_H_H_os'].append(_diff_H_H_o)
-        
-        
-        grad_norm_squared.append(_grad_norm_squared)
-        loss_values.append(_loss_values)
-        
-        
+            _training_information, _hessian_information = train_network(x_train, y_train, train_dl, 
+                                                                        loss_func, network, 
+                                                                        optimizer=optimizer, 
+                                                                        lr=lr, epochs=epochs, 
+                                                                        calc_cond_num=True, 
+                                                                        verbose_level=verbose_level,
+                                                                        calc_every_x_epoch=calc_every_x_epoch)
+            
+            training_information = pd.concat([training_information, _training_information])
+            hessian_information = pd.concat([hessian_information, _hessian_information])
+
+    training_information['grad_norm_squared'] = training_information['grad_norm_squared'].astype(float)
+    training_information['loss'] = training_information['loss'].astype(float)
         
     if calc_cond_num==False:
         
-        return loss_values, grad_norm_squared
+        return training_information,
     else: 
         
-        return loss_values, grad_norm_squared, cond_infos
+        hessian_information['H_o_cond'] = hessian_information['H_o_cond'].astype(float)
+        hessian_information['mean_diff_H_H_o'] = hessian_information['mean_diff_H_H_o'].astype(float)
+        hessian_information['max_diff_H_H_o'] = hessian_information['max_diff_H_H_o'].astype(float)
+
+        return training_information, hessian_information
 
 def generate_gaussian_data_for_bin_classification(n, mean_1,mean_2,cov_1,cov_2):
     
@@ -206,137 +231,165 @@ def generate_gaussian_data_for_bin_classification(n, mean_1,mean_2,cov_1,cov_2):
 
     return torch.tensor(x_data), torch.tensor(y_data)
 
-def plot_diff_H_H_O_elementwise(cond_infos, num_param, m_L_config, epochs, calc_every_x_epoch, filetitle=''):
+def plot_diff_H_H_O_elementwise(hessian_information, filetitle='', hue_variable=None, size_variable=None):
+
+    # plot average element-wise difference between H and H_O
+    plt.figure(figsize=(5,5))
+    
+    sns.set_theme()
+    g = sns.relplot(data=hessian_information, kind='line', x='epoch', y= 'mean_diff_H_H_o', 
+                    markers=True,
+                    style='activ_f',
+                    palette='colorblind', 
+                    hue=hue_variable, 
+                     size=size_variable)
+    g.set(yscale='log')
+    
+
+    plt.title('Average entrywise difference of $H$ and $H_O$ w/ ' + filetitle + ' networks')
+    plt.xlabel('Epochs')
+    plt.ylabel(r'$\frac{\||H - H_O\||_F}{n^2}$')
+        
+    filename_1 = 'figures/' + 'mean_diff_H_H_O_elementwise_' + filetitle + '.pdf'
+
+    plt.savefig(filename_1, bbox_inches='tight')
+    
+    # plot maximal element-wise difference between H and H_O
+    plt.figure(figsize=(5,5))
+    
+    sns.set_theme()
+    g = sns.relplot(data=hessian_information, kind='line', x='epoch', y= 'max_diff_H_H_o', 
+                    markers=True,
+                    style='activ_f',
+                    palette='colorblind', 
+                    hue=hue_variable, 
+                     size=size_variable)
+    g.set(yscale='log')
+    
+
+    plt.title('Maximal entrywise difference of $H$ and $H_O$ w/ ' + filetitle + ' networks')
+    plt.xlabel('Epochs')
+    plt.ylabel(r'$\max((H - H_O)_{ij})$')
+        
+    filename_2 = 'figures/' + 'max_diff_H_H_O_elementwise_' + filetitle + '.pdf'
+
+    plt.savefig(filename_2, bbox_inches='tight')
+
+def plot_extreme_eigenvalues(hessian_information, filetitle='', hue_variable=None, size_variable=None):
 
     plt.figure(figsize=(5,5))
     
-    markers = ['^', 's', 'o', '*', 'p','v', '<']
-    markevery = int(epochs/6)+1
-    markevery2 = int(epochs/(6*calc_every_x_epoch))+1
-
-    indx = list(np.arange(1,epochs,calc_every_x_epoch))
-    indx.insert(0,0)
-
-    for ind in range(len(num_param)):
-        plt.semilogy(indx,np.array(cond_infos['diff_H_H_os'][ind])/(num_param[ind]**2), 
-                     marker= markers[ind%len(markers)], 
-                     markevery=markevery2+(ind%7), 
-                     label='m= %d, L=%d' % (m_L_config[ind][0], m_L_config[ind][1]))
-
-        plt.title('Average entrywise difference of $H$ and $H_O$ w/ ' + filetitle + ' networks')
-        plt.xlabel('Epochs')
-        plt.ylabel(r'$\||(H - H_O)_{ij}\||_F$')
-        plt.legend(loc=(1,0), ncols=1)
-        
-    filename = 'figures/' + 'diff_H_H_O_elementwise_' + filetitle + '.pdf'
+    sns.set_theme()
+    
+    g = sns.lineplot(data=hessian_information, x='epoch', y= 'lam_abs_min_H', 
+                     markers=True, 
+                     style='activ_f', 
+                     palette='colorblind', 
+                     hue=hue_variable, 
+                     size=size_variable)
+    g.set(yscale='log')
+    
+    plt.xlabel('Epochs')
+    plt.ylabel(r'$\lambda_{\min}$')
+#     plt.legend(loc=(1,0), ncols=2)
+    plt.title('Evolution of smallest eigenvalues during training of ' + filetitle + ' networks')
+    
+    filename = 'figures/' + 'smallest_evals_during_training_' + filetitle + '.pdf'
 
     plt.savefig(filename, bbox_inches='tight')
 
-def plot_extreme_eigenvalues(cond_infos, num_param, m_L_config, epochs, calc_every_x_epoch, filetitle=''):
 
     plt.figure(figsize=(5,5))
-    
-    markers = ['^', 's', 'o', '*', 'p','v', '<']
-    markevery = int(epochs/6)+1
-    markevery2 = int(epochs/(6*calc_every_x_epoch))+1
 
-    indx = list(np.arange(1,epochs,calc_every_x_epoch))
-    indx.insert(0,0)
-    for ind in range(len(num_param)):
-        plt.semilogy(indx, cond_infos['lam_abs_maxs_H'][ind], 
-                     marker= markers[ind%len(markers)], 
-                     markevery=markevery2+(ind%7), 
-                     label='$\lambda_\max(H)$, m= %d, L=%d' % (m_L_config[ind][0], m_L_config[ind][1]))
-    for ind in range(len(num_param)):
-        plt.semilogy(indx, cond_infos['lam_abs_mins_H'][ind], 
-                     marker= markers[ind%len(markers)], 
-                     markevery=markevery2+(ind%7), 
-                     label='$\lambda_\min(H)$, m= %d, L=%d' % (m_L_config[ind][0], m_L_config[ind][1]))
-    for ind in range(len(num_param)):
-        plt.semilogy(indx, cond_infos['lam_abs_maxs_H'][ind], 
-                     marker= markers[ind%len(markers)], 
-                     markevery=markevery2+(ind%7), 
-                     label='$\lambda_\max(H_o)$, m= %d, L=%d' % (m_L_config[ind][0], m_L_config[ind][1]))
-    for ind in range(len(num_param)):
-        plt.semilogy(indx, cond_infos['lam_abs_mins_H_o'][ind], 
-                     marker= markers[ind%len(markers)], 
-                     markevery=markevery2+(ind%7), 
-                     label='$\lambda_\min(H_o)$, m= %d, L=%d' % (m_L_config[ind][0], m_L_config[ind][1]))
+    g = sns.lineplot(data=hessian_information, x='epoch', y= 'lam_abs_max_H',
+                     markers=True, 
+                     style='activ_f', 
+                     palette='colorblind', 
+                     hue=hue_variable, 
+                     size=size_variable)
+    g.set(yscale='log')
 
     plt.xlabel('Epochs')
-    plt.ylabel(r'$\lambda_{\min}, \lambda_{\max}$')
-    plt.legend(loc=(1,0), ncols=2)
-    plt.title('Evolution of eigenvalues during training of ' + filetitle + ' networks')
+    plt.ylabel(r'$\lambda_{\max}$')
+#     plt.legend(loc=(1,0), ncols=2)
+    plt.title('Evolution of largest eigenvalues during training of ' + filetitle + ' networks')
     
-    filename = 'figures/' + 'extreme_evals_during_training_' + filetitle + '.pdf'
+    filename = 'figures/' + 'largest_evals_during_training_' + filetitle + '.pdf'
 
     plt.savefig(filename, bbox_inches='tight')
 
-def plot_training_overview(loss_values, grad_norm_squared, cond_infos, num_param, m_L_config, epochs, calc_every_x_epoch,
-                          title1='MSE of ... Networks', filetitle=''):
+def plot_training_overview(training_information, hessian_information,
+                          title1='MSE of ... Networks', filetitle='',hue_variable=None,size_variable=None):
     
-    markers = ['^', 's', 'o', '*', 'p','v', '<']
-    markevery = int(epochs/6)+1
-    markevery2 = int(epochs/(6*calc_every_x_epoch))+1
+#     markers = ['^', 's', 'o', '*', 'p','v', '<']
+#     markevery = int(epochs/6)+1
+#     markevery2 = int(epochs/(6*calc_every_x_epoch))+1
 
     epsilon = 1e-13
 
-    min_loss_val = min(np.array(loss_values).flatten())
+    min_loss_val = min(np.array(training_information['loss']).flatten())
+    
+    
+    
     print('min MSE loss = %1.3e' %min_loss_val)
 
-    loss_to_plot = np.array(loss_values) - min_loss_val + epsilon
+    loss_to_plot = np.array(training_information['loss']) - min_loss_val + epsilon
+    
+    training_information = training_information.assign(rel_loss=pd.Series(loss_to_plot.flatten()))
 
     
-    plt.figure(figsize=(9,11))
+    plt.figure(figsize=(10,20))
 
-    plt.rc('xtick', labelsize=13) 
-    plt.rc('ytick', labelsize=13)
-
-    plt.subplot(311)
-    for ind in range(len(num_param)):
-        plt.semilogy(loss_to_plot[ind], 
-                     marker= markers[ind%len(markers)], 
-                     markevery=markevery+(ind%7), 
-                     label='m= %d, L=%d' % (m_L_config[ind][0], m_L_config[ind][1]))
-
-        plt.title(title1, fontsize=15)
-        plt.ylabel('MSE $f-f_{\min}$', fontsize=15)
-        plt.legend(loc=(1,0), ncols=1, fontsize=15)
-
-    plt.subplot(312)
-    for ind in range(len(num_param)):
-        plt.semilogy(np.array(grad_norm_squared[ind])+epsilon, 
-                     marker= markers[ind%len(markers)], 
-                     markevery=markevery+(ind%7), 
-                     label='m= %d, L=%d' % (m_L_config[ind][0], m_L_config[ind][1]))
-
-        plt.title('Gradient norm squared', fontsize=15)
-        plt.ylabel(r'$\||\nabla f_{\theta} (x) \||^2 $', fontsize=15)
-        plt.legend(loc=(1,0), ncols=1, fontsize=15)
+    plt.subplot(411)
+    
+    g = sns.lineplot(data=training_information, x='epoch', y='rel_loss', 
+                     style='activ_f', palette='colorblind',
+                     hue=hue_variable, 
+                     size=size_variable)
+    
+    g.set(yscale='log')
+    
+    plt.xlabel('')
 
 
+    plt.title(title1, fontsize=15)
+    plt.ylabel('rel. optimality $f-f_{\min}$', fontsize=15)
+#     plt.legend(loc=(1,0), ncols=1, fontsize=15)
 
-    plt.subplot(313)
+    plt.subplot(412)
+    
+    g = sns.lineplot(data=training_information, x='epoch', y='grad_norm_squared', 
+                     style='activ_f', palette='colorblind',
+                     hue=hue_variable, 
+                     size=size_variable)
 
-    indx = list(np.arange(1,epochs,calc_every_x_epoch))
-    indx.insert(0,0)
+    plt.title('Gradient norm squared', fontsize=15)
+    plt.ylabel(r'$\||\nabla f_{\theta} (x) \||^2 $', fontsize=15)
+#     plt.legend(loc=(1,0), ncols=1, fontsize=15)
 
-    for ind in range(len(num_param)):
-        plt.semilogy(indx,cond_infos['H_conds'][ind], 
-                     marker= markers[ind%len(markers)], 
-                     markevery=markevery2+(ind%7), 
-                     label='$\kappa(H)$, $m= %d, L=%d$' % (m_L_config[ind][0], m_L_config[ind][1]))
+    g.set(yscale='log')
+    plt.xlabel('')
 
-    for ind in range(len(num_param)):
-        plt.semilogy(indx,cond_infos['H_o_conds'][ind], 
-                     marker= markers[ind%len(markers)], 
-                     markevery=markevery2+(ind%7), 
-                     label='$\kappa(H_O)$, $m= %d, L=%d$' % (m_L_config[ind][0], m_L_config[ind][1]))
-
-    plt.title('Condition number of Hessian', fontsize=15)
-    plt.legend(loc=(1,0), ncols=2, fontsize=15)
-    plt.ylabel('$\kappa(H_O), \kappa(H)$', fontsize=15)
-    plt.xlabel('Epochs', fontsize=15)
+    plt.subplot(413)
+    
+    g = sns.lineplot(data=hessian_information, x='epoch', y='H_cond', 
+                     style='activ_f', palette='colorblind', markers=True,
+                     hue=hue_variable, 
+                     size=size_variable)
+    
+    g.set(yscale='log')
+    plt.xlabel('')
+    
+    plt.subplot(414)
+    
+    g = sns.lineplot(data=hessian_information, x='epoch', y='H_o_cond', 
+                     style='activ_f', palette='colorblind', markers=True,
+                     hue=hue_variable, 
+                     size=size_variable)
+    
+    g.set(yscale='log')
+    
+    plt.xlabel('Epochs')
     
     filename = 'figures/' + 'training_' + filetitle + '_networks' + '.pdf'
 
@@ -345,7 +398,7 @@ def plot_training_overview(loss_values, grad_norm_squared, cond_infos, num_param
 
 def main(project_name, experiment_name, config):
 
-    print('Running experiment %s for project %s ' %(config['experiment_name'], config['project_name']))
+    print('Running experiment %s for project %s ' %(experiment_name, project_name))
 
     #TODO: Create new folder to save generated figures in this folder 
     #TODO: with specifications from config file
@@ -435,25 +488,24 @@ def main(project_name, experiment_name, config):
         loss_func = F.mse_loss
 
     if config['calc_cond_num'] == False:
-        loss_values, grad_norm_squared = train_network_configurations(Networks, x_train, y_train, train_dl, loss_func, m_L_config, 
-                                                                     epochs, lrs, optimizer=config['optimizer'], 
-                                                                     calc_cond_num=False, 
-                                                                     verbose_level=config['config_level'], seed=config['seed'])
+        training_information = train_network_configurations(Networks, x_train, y_train, train_dl, loss_func, m_L_config, 
+                                                            epochs, lrs, optimizer=config['optimizer'], 
+                                                            calc_cond_num=False, 
+                                                            verbose_level=config['config_level'], seed=config['seed'])
     else:
-        loss_values, grad_norm_squared, cond_infos = train_network_configurations(Networks, x_train, y_train, train_dl, loss_func, m_L_config, 
-                                                                    epochs, lrs, optimizer=config['optimizer'], 
-                                                                    calc_cond_num=True, calc_every_x_epoch=calc_every_x_epoch, 
-                                                                    verbose_level=config['verbose_level'], seed=config['seed'])
+        training_information, hessian_information  = train_network_configurations(Networks, x_train, y_train, train_dl, loss_func, m_L_config, 
+                                                                                epochs, lrs, optimizer=config['optimizer'], 
+                                                                                calc_cond_num=True, calc_every_x_epoch=calc_every_x_epoch, 
+                                                                                verbose_level=config['verbose_level'], seed=config['seed'])
         
+        plot_diff_H_H_O_elementwise(hessian_information, filetitle=config['experiment_name'], hue_variable='width', size_variable='depth')
 
-    plot_diff_H_H_O_elementwise(cond_infos, num_param, m_L_config, epochs, calc_every_x_epoch, filetitle=config['experiment_name'])
+        plot_extreme_eigenvalues(hessian_information, filetitle=config['experiment_name'], hue_variable='width', size_variable='depth')
 
-    plot_extreme_eigenvalues(cond_infos, num_param, m_L_config, epochs, calc_every_x_epoch, filetitle=config['experiment_name'])
+        plot_training_overview(training_information, hessian_information, title1='MSE of %s networks' %config['activation_func'], filetitle=config['experiment_name'], hue_variable='width', size_variable='depth')
 
-    plot_training_overview(loss_values, grad_norm_squared, cond_infos, num_param, m_L_config, epochs, calc_every_x_epoch,
-                        title1='MSE of %s networks' %config['activation_func'], filetitle=config['experiment_name'])
-
-
+    training_information.to_pickle("pandas_dataframes/training_information_%s.pkl" %config['experiment_name'])
+    hessian_information.to_pickle("pandas_dataframes/hessian_information_%s.pkl" %config['experiment_name'])
 if __name__ == '__main__':
 
     torch.set_default_dtype(torch.float64)
@@ -479,6 +531,3 @@ if __name__ == '__main__':
     # start training with name and config 
     main(config['project_name'], config['experiment_name'], config)
 
-## open features 
-# patience, divergence checks not implemented
-# update torch? (to not get warning)

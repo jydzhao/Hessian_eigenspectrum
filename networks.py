@@ -15,6 +15,8 @@ class Sequential_NN(nn.Module):
         """
         super().__init__()
         
+        self.width = m
+        self.depth = L+1
         self.activation_func = activation
         
         if activation=='linear':

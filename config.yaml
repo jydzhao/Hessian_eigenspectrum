@@ -3,9 +3,9 @@
 ###########
 project_name: "synthetic_experiments" # baseline for synthetic experiments
 experiment_name: "effect_of_Linear_activ_func"
-max_epochs: 15000
+max_epochs: 500
 calc_cond_num: True # Bool to calculate second order infotmation or not
-calc_every_iter: 200 # calculate second order information every x iterations
+calc_every_iter: 100 # calculate second order information every x iterations
 verbose_level: 0 
 
 #########
