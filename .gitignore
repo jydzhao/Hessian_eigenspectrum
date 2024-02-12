@@ -1,6 +1,13 @@
 *.pdf
 
 .DS_Store
+.ipynb_checkpoints/
+Jupyter_notebooks/
+Meetings/
+pandas_dataframes/
+final_pandas_dataframes/
+trained_models/
+
 
 figures/
 data/

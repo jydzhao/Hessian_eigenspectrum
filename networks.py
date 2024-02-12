@@ -15,6 +15,8 @@ class Sequential_NN(nn.Module):
         """
         super().__init__()
         
+        self.input_dim = d
+        self.output_dim = k
         self.width = m
         self.depth = L+1
         self.activation_func = activation
@@ -35,15 +37,36 @@ class Sequential_NN(nn.Module):
         
         self.lin_hidden = nn.ModuleList([nn.Linear(m, m, bias=True) for i in range(self.L)])
         
-        self.sequential = nn.Sequential(self.lin_in)
         
+        if kwargs['batch_norm'] == True:
+            print('Using batch norm after all layers')
+            self.batch_norm = True
+            self.bn1 = torch.nn.BatchNorm1d( d )
+            self.bn2 = torch.nn.BatchNorm1d( m )
+        else:
+            self.batch_norm = False
+        
+        self.sequential = nn.Sequential(self.lin_in)
+
+        
+            
         for i in range(self.L):
             self.sequential.append(self.activ)
+            if self.batch_norm:
+                if i == 0:
+                    self.sequential.append(self.bn1)
+                else: 
+                    self.sequential.append(self.bn2)
+                    
             self.sequential.append(self.lin_hidden[i])
+            
         
         self.sequential.append(self.activ)
-        self.sequential.append(self.lin_out) 
         
+        if self.batch_norm:
+            self.sequential.append(self.bn2)
+            
+        self.sequential.append(self.lin_out) 
         
     def forward(self, xb):
         xb = self.sequential(xb)
@@ -86,6 +109,15 @@ class Sequential_NN(nn.Module):
             for i in range(self.L):
                 torch.nn.init.constant_(self.lin_hidden[i].bias, kwargs[0])
                 torch.nn.init.constant_(self.lin_hidden[i].weight, kwargs[0])
+        elif init_type == 'orthogonal':
+            torch.nn.init.normal_(self.lin_in.bias)
+            torch.nn.init.normal_(self.lin_out.bias)
+            torch.nn.init.orthogonal_(self.lin_in.weight)
+            torch.nn.init.orthogonal_(self.lin_out.weight)
+
+            for i in range(self.L):
+                torch.nn.init.normal_(self.lin_hidden[i].bias)
+                torch.nn.init.orthogonal_(self.lin_hidden[i].weight)
         else:
             print('Unknown initialization. Using Kaiming normal initialization with linear as nonlinearity argument')
             torch.nn.init.normal_(self.lin_in.bias)
@@ -107,6 +139,7 @@ class Sequential_fully_skip_NN(nn.Module):
             k: output dimension
             L: number of hidden layers
             beta: scale of residual connections
+            activation: activation function: linear, relu, leaky_relu, gelu
         """
         super().__init__()
         
@@ -121,8 +154,12 @@ class Sequential_fully_skip_NN(nn.Module):
         elif activation=='gelu':
             self.activ = nn.GELU()
         
+        self.input_dim = d
+        self.output_dim = k
         self.beta = beta
         self.L = L
+        self.depth = L+1
+        self.width = m
         self.lin_out = nn.Linear(m, k, bias=True)
         self.lin_in = nn.Linear(d, m, bias=True)
         
@@ -212,8 +249,14 @@ class Linear_skip_single_layer_NN(nn.Module):
         """
         super().__init__()
         
+        self.activation_func = 'linear'
+        self.input_dim = d
+        self.output_dim = k
         self.beta = beta
         self.L = L
+        self.depth = L+1
+        self.width = m
+        
  
         self.lin_out = nn.Linear(m, k, bias=False)
         self.lin_in = nn.Linear(d, m, bias=False)

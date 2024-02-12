@@ -1,12 +1,15 @@
 ###########
 # General #
 ###########
-project_name: "synthetic_experiments" # baseline for synthetic experiments
-experiment_name: "effect_of_Linear_activ_func"
-max_epochs: 500
-calc_cond_num: True # Bool to calculate second order infotmation or not
-calc_every_iter: 100 # calculate second order information every x iterations
+project_name: "mnist_experiments" # baseline for synthetic experiments
+experiment_name: "effect_of_m_L_on_cond_H_O_more_layers"
+num_inits: 3
+max_epochs: 1000
+calc_every_iter: 100
 verbose_level: 0 
+calc_cond_num: False
+save_model: True
+save_path: 'trained_models/'
 
 #########
 # Model #
@@ -14,7 +17,7 @@ verbose_level: 0
 # possible models: sequential, sequential_w_fully_skip
 model_name: 'sequential'
 hidden_layers: [1]
-width: [60]
+width: [110]
 # possible activation functions: linear, relu, gelu, leaky_relu
 activation_func: 'linear'
 # for leaky_relu:
@@ -23,18 +26,30 @@ neg_slope: 0.5
 beta: 1
 seed: 314159
 
+############
+# Analysis #
+############
+# method to calculate the condition number of the Hessian and outer product Hessian
+method_cond_num: 'robust_cond_num'
+
 #########
 # Data #
 #########
-# synthetic bimodal gaussian dataset for binary classification
-input_dim: 2
-data_pts_per_class_training: 100
-data_pts_per_class_validation: 100
-data_pts_per_class_testing: 100
-mean_class1: [0, 5.]
-mean_class2: [0, -5.]
-cov_class1: [[0.25,0],[0,0.25]]
-cov_class2: [[0.25,0],[0,0.25]]
+
+# possible choices: gaussian, mnist, fashion
+dataset: 'mnist'
+input_dim: 100 #[100] #needs to be adjusted accordingly (depending on downsample_factor) if using MNIST as dataset
+output_dim: 10 #[10]
+
+# synthetic bimodal gaussian dataset 
+data_pts_per_class_training: 1000
+data_pts_per_class_validation: 200
+data_pts_per_class_testing: 200
+
+# MNIST dataset
+downsample_factor: 3
+datapoints: 2000
+normalize_mnist: True
 
 
 ############# 
@@ -44,6 +59,12 @@ loss_func: 'mse'
 # possible optims: sgd, adam
 optimizer: 'SGD'
 batch_size: 200
-lr: [0.001]
+lr: [0.005]
 momentum: 0
 weight_decay: 0.000
+
+############
+# Plotting #
+############
+hue_var: 'depth'
+size_var: 'width'

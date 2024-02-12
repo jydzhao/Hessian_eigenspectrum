@@ -1,0 +1,96 @@
+###########
+# General #
+###########
+project_name: "trained_experiments" # baseline for synthetic experiments
+experiment_name: "LinearNet_trained_on_downspld_MNIST_normalized_with_SGD_bs=200"
+verbose_level: 0 
+calc_H_O_info : True
+log_yaml_file: True
+
+#########
+# Model #
+#########
+# possible models: sequential, lin_residual_network, sequential_w_fully_skip
+path: 'trained_models/'
+filenames: ['network_d=100_m=110_k=10_L=1_linear_SGD_mnist_normalized.pt',
+            'network_d=100_m=110_k=10_L=2_linear_SGD_mnist_normalized.pt',
+            'network_d=100_m=110_k=10_L=3_linear_SGD_mnist_normalized.pt',
+            'network_d=100_m=110_k=10_L=4_linear_SGD_mnist_normalized.pt',
+            'network_d=100_m=150_k=10_L=1_linear_SGD_mnist_normalized.pt',
+            'network_d=100_m=150_k=10_L=2_linear_SGD_mnist_normalized.pt',
+            'network_d=100_m=150_k=10_L=3_linear_SGD_mnist_normalized.pt',
+            'network_d=100_m=150_k=10_L=4_linear_SGD_mnist_normalized.pt',
+            'network_d=100_m=200_k=10_L=1_linear_SGD_mnist_normalized.pt',
+            'network_d=100_m=200_k=10_L=2_linear_SGD_mnist_normalized.pt',
+            'network_d=100_m=200_k=10_L=3_linear_SGD_mnist_normalized.pt',
+            'network_d=100_m=200_k=10_L=4_linear_SGD_mnist_normalized.pt',
+            'network_d=100_m=110_k=10_L=1_linear_SGD_mnist_normalized_0.pt',
+            'network_d=100_m=110_k=10_L=2_linear_SGD_mnist_normalized_0.pt',
+            'network_d=100_m=110_k=10_L=3_linear_SGD_mnist_normalized_0.pt',
+            'network_d=100_m=110_k=10_L=4_linear_SGD_mnist_normalized_0.pt',
+            'network_d=100_m=150_k=10_L=1_linear_SGD_mnist_normalized_0.pt',
+            'network_d=100_m=150_k=10_L=2_linear_SGD_mnist_normalized_0.pt',
+            'network_d=100_m=150_k=10_L=3_linear_SGD_mnist_normalized_0.pt',
+            'network_d=100_m=150_k=10_L=4_linear_SGD_mnist_normalized_0.pt',
+            'network_d=100_m=200_k=10_L=1_linear_SGD_mnist_normalized_0.pt',
+            'network_d=100_m=200_k=10_L=2_linear_SGD_mnist_normalized_0.pt',
+            'network_d=100_m=200_k=10_L=3_linear_SGD_mnist_normalized_0.pt',
+            'network_d=100_m=200_k=10_L=4_linear_SGD_mnist_normalized_0.pt',
+            'network_d=100_m=110_k=10_L=1_linear_SGD_mnist_normalized_1.pt',
+            'network_d=100_m=110_k=10_L=2_linear_SGD_mnist_normalized_1.pt',
+            'network_d=100_m=110_k=10_L=3_linear_SGD_mnist_normalized_1.pt',
+            'network_d=100_m=110_k=10_L=4_linear_SGD_mnist_normalized_1.pt',
+            'network_d=100_m=150_k=10_L=1_linear_SGD_mnist_normalized_1.pt',
+            'network_d=100_m=150_k=10_L=2_linear_SGD_mnist_normalized_1.pt',
+            'network_d=100_m=150_k=10_L=3_linear_SGD_mnist_normalized_1.pt',
+            'network_d=100_m=150_k=10_L=4_linear_SGD_mnist_normalized_1.pt',
+            'network_d=100_m=200_k=10_L=1_linear_SGD_mnist_normalized_1.pt',
+            'network_d=100_m=200_k=10_L=2_linear_SGD_mnist_normalized_1.pt',
+            'network_d=100_m=200_k=10_L=3_linear_SGD_mnist_normalized_1.pt',
+            'network_d=100_m=200_k=10_L=4_linear_SGD_mnist_normalized_1.pt',
+            'network_d=100_m=110_k=10_L=1_linear_SGD_mnist_normalized_2.pt',
+            'network_d=100_m=110_k=10_L=2_linear_SGD_mnist_normalized_2.pt',
+            'network_d=100_m=110_k=10_L=3_linear_SGD_mnist_normalized_2.pt',
+            'network_d=100_m=110_k=10_L=4_linear_SGD_mnist_normalized_2.pt',
+            'network_d=100_m=150_k=10_L=1_linear_SGD_mnist_normalized_2.pt',
+            'network_d=100_m=150_k=10_L=2_linear_SGD_mnist_normalized_2.pt',
+            'network_d=100_m=150_k=10_L=3_linear_SGD_mnist_normalized_2.pt',
+            'network_d=100_m=150_k=10_L=4_linear_SGD_mnist_normalized_2.pt',
+            'network_d=100_m=200_k=10_L=1_linear_SGD_mnist_normalized_2.pt',
+            'network_d=100_m=200_k=10_L=2_linear_SGD_mnist_normalized_2.pt',
+            'network_d=100_m=200_k=10_L=3_linear_SGD_mnist_normalized_2.pt',
+            'network_d=100_m=200_k=10_L=4_linear_SGD_mnist_normalized_2.pt'
+            ]
+model_name: 'sequential'
+
+############
+# Analysis #
+############
+# method to calculate the condition number of the Hessian and outer product Hessian
+method_cond_num: 'naive'
+
+#########
+# Data #
+#########
+
+# possible choices: gaussian, mnist, fashion
+dataset: 'mnist'
+# input_dim: [100] #needs to be adjusted accordingly (depending on downsample_factor) if using MNIST as dataset
+# output_dim: [10]
+
+# synthetic bimodal gaussian dataset 
+data_pts_per_class_training: 1000
+data_pts_per_class_validation: 200
+data_pts_per_class_testing: 200
+seed: 31415926
+
+# MNIST dataset
+downsample_factor: 3
+datapoints: 2000
+normalize_mnist: True
+
+############# 
+# Optimizer #
+############# 
+loss_func: 'mse'
+
