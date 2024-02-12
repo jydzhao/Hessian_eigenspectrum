@@ -43,9 +43,7 @@ def calc_cond_num_outer_prod_hess_explicit_1_hiddenlayer_leaky_ReLU(network, X):
     V = network.lin_in.weight.detach()
     W = network.lin_out.weight.detach()
     
-    XTX = X.T @ X
-#     XXT = X @ X.T
-    
+    XTX = X.T @ X    
     
     lam_min_XTX = torch.linalg.eigvalsh(XTX)[0]
     lam_max_XTX = torch.linalg.eigvalsh(XTX)[-1]
@@ -96,19 +94,16 @@ def calc_cond_num_outer_prod_hess_explicit_1_hiddenlayer_leaky_ReLU(network, X):
     
     cond_H_o_upper_bound1 = (lam_max_XTX * lam_max_WWT + lam_max_terms2)/(alpha**2*lam_min_XTX * lam_min_WWT + lam_min_terms2)
 
+    cond_H_o_upper_bound15 = (lam_max_XTX * lam_max_WWT + lam_max_XTVVTX)/(alpha**2*lam_min_XTX * lam_min_WWT + lam_min_terms2)
+    
     cond_H_o_upper_bound2 = (lam_max_XTX * lam_max_WWT + lam_max_XTVVTX)/(alpha**2*lam_min_XTX * lam_min_WWT + alpha**2 * lam_min_XTVVTX)
     
-    # Calculate cond(\hat{H}_O) according to Eq. (35)
-        
-#     mat_rank = torch.linalg.matrix_rank(H_O)
-#     eigvals = torch.sort(abs(torch.linalg.eigvalsh(H_O))).values
+
     cond_H_o = torch.linalg.cond(H_O)
-    # print(eigvals)
-#         print('cond=',eigvals[-1]/eigvals[-mat_rank])
-#     cond_H_o = eigvals[-1]/eigvals[-mat_rank]
+
     
 
-    return float(cond_H_o), float(cond_H_o_upper_bound1), float(cond_H_o_upper_bound2)
+    return float(cond_H_o), float(cond_H_o_upper_bound1), float(cond_H_o_upper_bound2), float(cond_H_o_upper_bound15)
 
 def calc_cond_num_outer_prod_hess_explicit_linearNN(d, l, k, m, network, cond_cov_xx, cov_xx, device):
 
@@ -645,7 +640,7 @@ def eval_network_cond_num_outer_prod_hess(num_inits, init_type, networks, datase
                 H_o_cond, H_o_cond_bound1, H_o_cond_bound2, H_o_cond_bound3 = calc_cond_num_outer_prod_hess_explicit_linearResNN(d, l, k, m, network, cond_cov_xx, cov_xx, device)
             elif config['model_name'] == 'sequential' and config['activation_func'] == 'leaky_relu':
 
-                H_o_cond, H_o_cond_bound1, H_o_cond_bound2 = calc_cond_num_outer_prod_hess_explicit_1_hiddenlayer_leaky_ReLU(network, x.T)
+                H_o_cond, H_o_cond_bound1, H_o_cond_bound2, H_o_cond_bound15 = calc_cond_num_outer_prod_hess_explicit_1_hiddenlayer_leaky_ReLU(network, x.T)
 
             outer_prod_hessian_information.loc[len(outer_prod_hessian_information)] = [dataset, config['model_name'],
                                                                                        cond_cov_xx,
@@ -665,12 +660,12 @@ def eval_network_cond_num_outer_prod_hess(num_inits, init_type, networks, datase
                                                                 network.width, network.depth, network.activation_func, 0,
                                                                 'H_o_cond_bound2', H_o_cond_bound2
                                                                 ]
-#             outer_prod_hessian_information.loc[len(outer_prod_hessian_information)] = [dataset, config['model_name'],
-#                                                                                        cond_cov_xx,
-#                                                                 network.input_dim, network.output_dim, 
-#                                                                 network.width, network.depth, network.activation_func, 0,
-#                                                                 'H_o_cond_bound3', H_o_cond_bound3
-#                                                                 ]
+            outer_prod_hessian_information.loc[len(outer_prod_hessian_information)] = [dataset, config['model_name'],
+                                                                                       cond_cov_xx,
+                                                                network.input_dim, network.output_dim, 
+                                                                network.width, network.depth, network.activation_func, 0,
+                                                                'H_o_cond_bound1.5', H_o_cond_bound15
+                                                                ]
         print('Time passed for H_O calculations: %.3f seconds' %(datetime.datetime.now()-time_start).total_seconds())  
     
     return outer_prod_hessian_information

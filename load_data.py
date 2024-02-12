@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 from torch.distributions.multivariate_normal import MultivariateNormal
 import torch.nn.functional as F
@@ -47,15 +48,15 @@ def load_mnist(dataset, n, downsample_factor, whiten, device):
 
     if whiten==True:
         
-        U, s, Vt = torch.linalg.svd(x_train, full_matrices=False)
+        U, s, Vt = np.linalg.svd(x_train, full_matrices=False)
 
         # U and Vt are the singular matrices, and s contains the singular values.
         # Since the rows of both U and Vt are orthonormal vectors, then U * Vt
         # will be white
-        x_train = torch.dot(U, Vt)
+        x_train = np.dot(U, Vt)
         
-        U, s, Vt = torch.linalg.svd(x_valid, full_matrices=False)
-        x_valid = torch.dot(U, Vt)
+        U, s, Vt = np.linalg.svd(x_valid, full_matrices=False)
+        x_valid = np.dot(U, Vt)
     
 
     # convert labels into 1-hot encoding
@@ -68,7 +69,7 @@ def load_mnist(dataset, n, downsample_factor, whiten, device):
     y_valid_onehot = y_valid_onehot.to(torch.float64)
 
     # downsample input data
-    dim = int(torch.ceil(28/downsample_factor))
+    dim = int(np.ceil(28/downsample_factor))
 
     print('Downsampling MNIST data by a factor of %d' %downsample_factor)
     print('Resulting image size: (%d x %d) ' %(dim,dim))
@@ -80,14 +81,14 @@ def load_mnist(dataset, n, downsample_factor, whiten, device):
     for i in range(x_train.shape[0]):
         tmp = x_train[i].reshape((28, 28))
         tmp_downsampled = tmp[0::downsample_factor,0::downsample_factor]
-        x_train_downsampled[i] = tmp_downsampled.flatten()
+        x_train_downsampled[i] = torch.tensor(tmp_downsampled.flatten(), device=device)
         
     # x_train_downsampled = torch.tensor(x_train_downsampled).to(device)
         
     for i in range(x_valid.shape[0]):
         tmp = x_valid[i].reshape((28, 28))
         tmp_downsampled = tmp[0::downsample_factor,0::downsample_factor]
-        x_valid_downsampled[i] = tmp_downsampled.flatten()
+        x_valid_downsampled[i] = torch.tensor(tmp_downsampled.flatten(), device=device)
         
     # x_valid_downsampled = torch.tensor(x_valid_downsampled).to(device)
 
@@ -126,15 +127,15 @@ def load_cifar10(n, grayscale, flatten, whiten, device):
     
     if whiten==True:
         
-        U, s, Vt = torch.linalg.svd(x_train, full_matrices=False)
+        U, s, Vt = np.linalg.svd(x_train, full_matrices=False)
 
         # U and Vt are the singular matrices, and s contains the singular values.
         # Since the rows of both U and Vt are orthonormal vectors, then U * Vt
         # will be white
-        x_train = torch.dot(U, Vt)
+        x_train = np.dot(U, Vt)
         
-        U, s, Vt = torch.linalg.svd(x_valid, full_matrices=False)
-        x_valid = torch.dot(U, Vt)
+        U, s, Vt = np.linalg.svd(x_valid, full_matrices=False)
+        x_valid = np.dot(U, Vt)
     
     # convert labels into 1-hot encoding
     y_train = torch.tensor(y_train, dtype=torch.int64, device=device)
@@ -198,12 +199,12 @@ def generate_gaussian_data_for_bin_classification(n, d, k, device, whiten):
     
     if whiten==True:
         
-        U, s, Vt = torch.linalg.svd(x_data, full_matrices=False)
+        U, s, Vt = np.linalg.svd(x_data, full_matrices=False)
 
         # U and Vt are the singular matrices, and s contains the singular values.
         # Since the rows of both U and Vt are orthonormal vectors, then U * Vt
         # will be white
-        x_data = torch.dot(U, Vt)
+        x_data = np.dot(U, Vt)
 
 
     return torch.tensor(x_data).to(device), torch.tensor(y_data).to(device)
