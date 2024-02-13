@@ -92,6 +92,8 @@ def compute_jacobian(model, x):
 
     we'll be working on a copy of the model because we don't want to interfere with the optimizers and other functionality
     '''
+    
+
 
     jac_model = copy.deepcopy(model) # because we're messing around with parameters (deleting, reinstating etc)
     all_params, all_names = extract_weights(jac_model) # "deparameterize weights"
@@ -109,7 +111,6 @@ def compute_jacobian(model, x):
 
         n = jac.shape[0]
         k = jac.shape[1]
-        # print('jac_shape:', jac.shape)
         if len(jac.shape) == 4:
             j = torch.reshape(jac,(n,k,jac.shape[-1]*jac.shape[-2]))
         else:
@@ -118,13 +119,13 @@ def compute_jacobian(model, x):
             jacobian = j
         else:
             jacobian = torch.cat([jacobian,j],dim=2)
-    # print(jacobian.shape)        
+#     print(jacobian.shape)        
 
     del jac_model # cleaning up
     
     return jacobian
 
-def calc_hessian(network,x,y,loss_func):
+def calc_hessian(network,x,y,loss_func,device):
 #     https://stackoverflow.com/questions/74900770/fast-way-to-calculate-hessian-matrix-of-model-parameters-in-pytorch
     '''
     Calculates the full Hessian of the loss function w.r.t. the parameters
@@ -134,6 +135,7 @@ def calc_hessian(network,x,y,loss_func):
     x        : input datapoints
     y        : output datapoints/labels
     loss_func: loss function
+    device   : cpu or gpu
     '''
     
     # calculate the prediction at initialization (no training)
@@ -159,7 +161,9 @@ def calc_hessian(network,x,y,loss_func):
     H_spectrum = torch.linalg.eigvalsh(H.detach())
     # H_rank = torch.linalg.matrix_rank(H.detach(), atol=1e-7/H.shape[0])
     
-    H = H.detach()
+#     print(device)
+    
+    H = H.to(device)
 
     return H, H_spectrum
 
@@ -171,6 +175,7 @@ def calc_outer_prod_hessian(network,x):
     network: Neural network
     x: input samples
     '''
+    
     print('Calculating Jacobian...')
     jacob = compute_jacobian(network,x)
 
@@ -182,18 +187,23 @@ def calc_outer_prod_hessian(network,x):
 
     jac_jac_T = torch.zeros(jacob.shape[2],jacob.shape[2])
 
-    print(n)
     for i in range(n):
-        
-        if i%200 == 0:
-            print('i:',i)
-        
+                
         jac_jac_T += jacob[i,:,:].T @ jacob[i,:,:]
 
+    del jacob
+    
+    # arr = [jacob[i,:,:].T @ jacob[i,:,:] for i in range(n)]
     jac_jac_T = 2*jac_jac_T/n
-        
-    jac_jac_T_spectrum = np.float64(torch.linalg.eigvalsh(jac_jac_T).detach()) #[-jac_jac_T_rank:]
+    
+#     jac_jac_T_rank = torch.linalg.matrix_rank(jac_jac_T, atol=1e-7/jac_jac_T.shape[0])
+    # jac_jac_T_rank = torch.linalg.matrix_rank(jac_jac_T, atol=1e-7/jac_jac_T.shape[0])
+    
+    jac_jac_T_spectrum = torch.linalg.eigvalsh(jac_jac_T) #[-jac_jac_T_rank:]
+
     jac_jac_T = jac_jac_T
+    
+    
     
     return jac_jac_T, jac_jac_T_spectrum
 
@@ -203,16 +213,7 @@ def calc_condition_num(network,x,y,loss,device,calc_H,method='naive'):
     '''
     Calculates the condition number of the full Hessian the outer-product Hessian and the extreme eigenvalues of 
     the full Hessian given a Neural network, the loss function and input & output data
-
-    network: Neural network
-    x: input samples
-    y: output samples
-    loss: loss function 
-    device: cpu or cuda
-    calc_H: Boolean, calculate the condition number of the full Hessian H or not
-    method: method of calculating the rank of the Hessian. Naive uses the torch internal matrix_rank() function
     '''
-    print('Calculating condition number...')
 
     # calculate the outer-product Hessian, its spectrum 
     H_o, H_o_spectrum = calc_outer_prod_hessian(network,x)
@@ -225,15 +226,17 @@ def calc_condition_num(network,x,y,loss,device,calc_H,method='naive'):
         max_diff_H_H_o = torch.max(H_full-H_o)
         std_diff_H_H_o = torch.std(H_full-H_o)
     
+#     print('H_rank= ', H_rank)
+
     
 
     if method == 'naive':
 
         # calculate the full Hessian rank outer-product Hessian rank using the matrix_rank() function
         if calc_H == True:
-            H_rank = int(torch.linalg.matrix_rank( H_full, atol=1e-8/H_full.shape[0]))
+            H_rank = int(torch.linalg.matrix_rank( H_full, atol=1e-7/H_full.shape[0]))
             
-        H_o_rank = int(torch.linalg.matrix_rank(H_o, atol=1e-8/H_o.shape[0])) 
+        H_o_rank = int(torch.linalg.matrix_rank(H_o, atol=1e-7/H_o.shape[0])) 
 
     elif method == 'stable_matrix_rank':
 
@@ -244,14 +247,20 @@ def calc_condition_num(network,x,y,loss,device,calc_H,method='naive'):
             
         H_o_rank = int((np.linalg.norm(H_o,'fro')**2)/(np.linalg.norm(H_o,2)**2))
 
+#         print('dim(H)=',H_full.shape[0])
+#         print('dim(H_O)=',H_o.shape[0])
+
+#         print('r(H)=', (np.linalg.norm(H_full,'fro')**2)/(np.linalg.norm(H_full,2)**2))
+#         print('r(H_O)=', (np.linalg.norm(H_o,'fro')**2)/(np.linalg.norm(H_o,2)**2))
+
     elif method == 'robust_cond_num': 
         # calculate the full Hessian rank outer-product Hessian rank using the robust condition number lambda_max/lambda_median: https://openreview.net/pdf?id=0uI5415ry7
 
         if calc_H == True:
-            H_rank = int(torch.linalg.matrix_rank(H_full, atol=1e-8/H_full.shape[0]))
+            H_rank = int(torch.linalg.matrix_rank(H_full, atol=1e-7/H_full.shape[0]))
             H_rank = int(H_rank/2)
             
-        H_o_rank = int(torch.linalg.matrix_rank(H_o, atol=1e-8/H_o.shape[0]))
+        H_o_rank = int(torch.linalg.matrix_rank(H_o, atol=1e-7/H_o.shape[0]))
         H_o_rank = int(H_o_rank/2)
     
     else: 
@@ -277,15 +286,14 @@ def calc_condition_num(network,x,y,loss,device,calc_H,method='naive'):
     lam_abs_max_H_o = (H_o_spectrum[-1])
     H_o_cond = (lam_abs_max_H_o/lam_abs_min_H_o)
     
+#     print(lam_abs_max_H.get_device())
+    
+    del H_o
     
     if calc_H == True:
         return H_cond, H_o_cond.cpu(), lam_abs_min_H, lam_abs_max_H, lam_abs_min_H_o.cpu(), lam_abs_max_H_o.cpu(), mean_diff_H_H_o.cpu(), max_diff_H_H_o.cpu(), std_diff_H_H_o.cpu(), H_rank, H_o_rank
     else:
-        return H_o_cond, lam_abs_min_H_o, lam_abs_max_H_o, H_o_rank
-    
-
-
-
+        return H_o_cond.cpu(), lam_abs_min_H_o.cpu(), lam_abs_max_H_o.cpu(), H_o_rank
 
 
 

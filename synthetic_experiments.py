@@ -23,8 +23,17 @@ import os
 from tqdm import tqdm
 import yaml
 
+from pathlib import Path
+import requests
+import pickle
+import gzip
 
-def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr, epochs, calc_cond_num=False, calc_H=False, method_cond_num='naive', verbose_level=0, calc_every_x_epoch=10, device='cpu',save_model=False, **kwargs):
+import mnist_reader
+
+
+def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr, epochs, calc_cond_num=False, method_cond_num='naive', verbose_level=0, calc_every_x_epoch=10, device='cpu',save_model=False, **kwargs):
+    
+    print('calc_every_x_epoch',calc_every_x_epoch)
     
     if optimizer == 'SGD':
         opt = optim.SGD(network.parameters(), lr=lr)
@@ -72,9 +81,9 @@ def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr,
     if calc_cond_num == True:
         _H_cond, _H_o_cond, _lam_abs_min_H, _lam_abs_max_H, _lam_abs_min_H_o, _lam_abs_max_H_o, _mean_diff_H_H_o, _max_diff_H_H_o, _std_diff_H_H_o, _H_rank, _H_o_rank = calc_condition_num(network,
                                                                     x_train,y_train,
-                                                                    loss_func,device,calc_H,
+                                                                    loss_func,
                                                                     method_cond_num)
-
+        
         hessian_information.loc[len(hessian_information)] = [network.width, network.depth, network.activation_func, 0, 
                                                              _H_cond, _H_o_cond, 
                                                              _lam_abs_min_H, _lam_abs_max_H, 
@@ -85,6 +94,13 @@ def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr,
     print('Epoch: 0 \t loss= %10.3e' %loss_func(network(x_train), y_train).detach())
 
     for epoch in tqdm(range(epochs)):
+        
+        if save_model == True and epoch%calc_every_x_epoch==0:
+            # print(network.lin_in.weight)
+            filename = (kwargs['save_path'] + 'network_' + 'd=%d_' + 'm=%d_' + 'k=%d_' + 'L=%d_' + '%s_' + '%s_' + '%s' + '_epoch=%s' + '.pt') % (network.input_dim, network.width, network.output_dim, network.depth, network.activation_func, optimizer, kwargs['dataset'], epoch)
+            # model_scripted.save(filename)
+            torch.save(network, filename)
+        
         if calc_cond_num == True and epoch%calc_every_x_epoch==0:
             _H_cond, _H_o_cond, _lam_abs_min_H, _lam_abs_max_H, _lam_abs_min_H_o, _lam_abs_max_H_o, _mean_diff_H_H_o, _max_diff_H_H_o, _std_diff_H_H_o, _H_rank, _H_o_rank = calc_condition_num(network,
                                                                                                                                                                             x_train,y_train,
@@ -125,26 +141,21 @@ def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr,
             print('Epoch: %d \t loss= %10.4e' %(epoch+1, loss_func(network(x_train), y_train).detach()))
          
         
-        if save_model == True and epoch%calc_every_x_epoch==0:
-            # print(network.lin_in.weight)
-            filename = (kwargs['save_path'] + '%s_network_' + 'd=%d_' + 'm=%d_' + 'k=%d_' + 'L=%d_' + '%s_' + '%s_' + '%s' + 'epoch=%d.pt') % (kwargs['experiment_name'], network.input_dim, network.width, network.output_dim, network.depth, network.activation_func, optimizer, kwargs['dataset'],epoch)
-            # model_scripted.save(filename)
-            torch.save(network, filename)
-        
-        
     print('Epoch: %d \t loss= %10.4e' %(epoch+1, loss_func(network(x_train), y_train).detach()))
 
     if save_model == True:
         # print(network.lin_in.weight)
-        filename = (kwargs['save_path'] + 'network_' + 'd=%d_' + 'm=%d_' + 'k=%d_' + 'L=%d_' + '%s_' + '%s_' + '%s' + 'epoch=%d.pt') % (network.input_dim, network.width, network.output_dim, network.depth, network.activation_func, optimizer, kwargs['dataset'],epoch)
+        filename = (kwargs['save_path'] + 'network_' + 'd=%d_' + 'm=%d_' + 'k=%d_' + 'L=%d_' + '%s_' + '%s_' + '%s_' + 'epoch=%s' + '.pt') % (network.input_dim, network.width, network.output_dim, network.depth, network.activation_func, optimizer, kwargs['dataset'], epoch)
         # model_scripted.save(filename)
         torch.save(network, filename)
+        
+        
     if calc_cond_num == True:
         return training_information, hessian_information
     else:
         return training_information
 
-def train_network_configurations(networks, init_type, x_train, y_train, train_dl, loss_func, m_L_config, epochs, lrs, optimizer='SGD', calc_cond_num=False, calc_H=False, method_cond_num='naive', calc_every_x_epoch=10, verbose_level=0, seed=314159, device='cpu', save_model=False, **kwargs):
+def train_network_configurations(networks, x_train, y_train, train_dl, loss_func, m_L_config, epochs, lrs, optimizer='SGD', calc_cond_num=False, method_cond_num='naive', calc_every_x_epoch=10, verbose_level=0, seed=314159, device='cpu', save_model=False, **kwargs):
     '''
     Train list of networks of different "configurations" (#hidden units, #hidden layers)
     networks: List of networks to be trained
@@ -197,7 +208,7 @@ def train_network_configurations(networks, init_type, x_train, y_train, train_dl
 
         # torch.manual_seed(seed)
 
-        network.init_weights(init_type)
+        network.init_weights('kaiming_normal')
 
         if np.isscalar(lrs):
             lr = lrs
@@ -214,16 +225,15 @@ def train_network_configurations(networks, init_type, x_train, y_train, train_dl
                                                 loss_func, network, 
                                                 optimizer=optimizer, 
                                                 lr=lr, epochs=epochs, 
-                                                calc_cond_num=False,calc_H=False,
+                                                calc_cond_num=False,
                                                 verbose_level=verbose_level,
-                                                calc_every_x_epoch=calc_every_x_epoch,
-                                                device=device, save_model=save_model, save_path= kwargs['save_path'], dataset= kwargs['dataset'], experiment_name=kwargs['experiment_name'])
+                                                device=device, save_model=save_model, save_path= kwargs['save_path'], dataset= kwargs['dataset'])
             else:
                 _training_information = train_network(x_train, y_train, train_dl,
                                                 loss_func, network, 
                                                 optimizer=optimizer, 
                                                 lr=lr, epochs=epochs, 
-                                                calc_cond_num=False,calc_H=False,
+                                                calc_cond_num=False,
                                                 verbose_level=verbose_level,
                                                 device=device)
             training_information = pd.concat([training_information, _training_information])
@@ -232,7 +242,7 @@ def train_network_configurations(networks, init_type, x_train, y_train, train_dl
                                                                         loss_func, network, 
                                                                         optimizer=optimizer, 
                                                                         lr=lr, epochs=epochs, 
-                                                                        calc_cond_num=True, calc_H=calc_H,
+                                                                        calc_cond_num=True, 
                                                                         method_cond_num=method_cond_num, 
                                                                         verbose_level=verbose_level,
                                                                         calc_every_x_epoch=calc_every_x_epoch,
@@ -257,38 +267,42 @@ def train_network_configurations(networks, init_type, x_train, y_train, train_dl
         return training_information, hessian_information
 
 
+
 def main(project_name, experiment_name, config):
 
-    if config['device'] == 'gpu' or config['device'] == 'cuda':
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    else:
-        device = torch.device('cpu')
-    
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
     print(device)
-    
     print('Running experiment %s for project %s ' %(experiment_name, project_name))
 
     if config['dataset'] == 'gaussian':
     # setting up Gaussian dataset
-
-        mean_1 = -torch.tensor(config['mean_class1'])
-        mean_2 = torch.tensor(config['mean_class2'])
-
-        cov_1 = torch.tensor(config['cov_class1'])
-        cov_2 = torch.tensor(config['cov_class2'])
 
         torch.manual_seed(config['seed'])
 
         n = config['data_pts_per_class_training']
         m = config['data_pts_per_class_validation']
         v = config['data_pts_per_class_testing']
+        
+        d = config['input_dim']
+        k = config['output_dim']
 
-        x_train, y_train = generate_gaussian_data_for_bin_classification(n, mean_1,mean_2,cov_1,cov_2, device)
-        x_val, y_val = generate_gaussian_data_for_bin_classification(v, mean_1,mean_2,cov_1,cov_2, device)
+        x_train, y_train = generate_gaussian_data_for_bin_classification(n, d, k, config['whiten_gaussian'], config['seed'], device)
+        x_test, y_test = generate_gaussian_data_for_bin_classification(m, d, k, config['whiten_gaussian'], config['seed'], device)
+        x_val, y_val = generate_gaussian_data_for_bin_classification(v, d, k, config['whiten_gaussian'], config['seed'], device)
+        
+        if config['whiten_gaussian']:
+            filename = project_name + '_' + experiment_name + '_x_train' + 'whitened.npy'
+            save_run(filename, x_train.cpu())
+            
+        else:
+            filename = project_name + '_' + experiment_name + '_x_train' + 'NOTwhitened.npy'
+            save_run(filename, x_train.cpu())
+            
     elif config['dataset'] == 'mnist' or config['dataset'] == 'fashion':
-        x_train, y_train, x_val, y_val = load_mnist(config['dataset'] ,config['datapoints'], config['downsample_factor'], config['whiten_mnist'], device)
+        x_train, y_train, x_val, y_val, x_test, y_test = load_mnist(config['dataset'] ,config['datapoints'], config['downsample_factor'], config['normalize_mnist'])
 
-
+        
     train_dl, valid_dl = create_dataloaders(x_train, y_train, x_val, y_val, config['batch_size'])
 
     # calculate the empirical input covariance matrix and its condition number
@@ -330,12 +344,12 @@ def main(project_name, experiment_name, config):
             if config['model_name'] == 'sequential':
 
                 if config['activation_func'] == 'leaky_relu':
-                    kwargs={'neg_slope': config['neg_slope'], 'batch_norm': config['batch_norm']} # negative slope of leaky ReLU
+                    kwargs={'neg_slope': config['neg_slope'], 'batch_norm':config['batch_norm']} # negative slope of leaky ReLU
                     Networks.append(Sequential_NN(d,m,k,l,'leaky_relu',**kwargs).to(device))
                 else:
                     # print(d,m,k,l)
                     # print(activ_func)
-                    kwargs={'batch_norm': config['batch_norm']} 
+                    kwargs={'batch_norm':config['batch_norm']}
                     Networks.append(Sequential_NN(d,m,k,l,activ_func,**kwargs).to(device))
             elif config['model_name'] == 'sequential_w_fully_skip':
                 if config['activation_func'] == 'leaky_relu':
@@ -358,7 +372,6 @@ def main(project_name, experiment_name, config):
     calc_every_x_epoch = config['calc_every_iter']
     # lrs = [0.02, 0.01, 0.01, 0.001, 0.0006, 0.0003] 
     lrs = config['lr']
-    init_type = config['init_type']
 
     if config['loss_func'] == 'mse':
         loss_func = F.mse_loss
@@ -367,18 +380,20 @@ def main(project_name, experiment_name, config):
 
         if config['calc_cond_num'] == False:
             
-            if (config['dataset'] == 'mnist' or config['data'] == 'fashion') and config['whiten_mnist'] == True:
-                dataset = config['dataset'] + '_' + 'whitened_' + '%d' %i
+            if (config['dataset'] == 'mnist' or config['dataset'] == 'fashion') and config['normalize_mnist'] == True:
+                dataset = config['dataset'] + '_' + 'normalized_' + '%d' %i
             else:
                 dataset = config['dataset'] + '_' + '%d' %i
 
-            training_information = train_network_configurations(Networks, init_type, x_train, y_train, train_dl, loss_func, m_L_config, 
+            training_information = train_network_configurations(Networks, x_train, y_train, train_dl, loss_func, m_L_config, 
                                                                 epochs, lrs, optimizer=config['optimizer'], 
-                                                                calc_cond_num=False, calc_H=False,
-                                                                calc_every_x_epoch=calc_every_x_epoch,
-                                                                verbose_level=config['verbose_level'], seed=config['seed'],device=device, save_model=config['save_model'], save_path=config['save_path'], experiment_name=config['experiment_name'], dataset=dataset)
+                                                                calc_cond_num=False, calc_every_x_epoch=calc_every_x_epoch,
+                                                                verbose_level=config['verbose_level'], seed=config['seed'],device=device, save_model=config['save_model'], save_path=config['save_path'], dataset=dataset)
         else:
-            training_information, hessian_information  = train_network_configurations(Networks, init_type, x_train, y_train, train_dl, loss_func, m_L_config, epochs, lrs, optimizer=config['optimizer'], calc_cond_num=True, calc_H = config['calc_H'], method_cond_num=config['method_cond_num'], calc_every_x_epoch=calc_every_x_epoch, verbose_level=config['verbose_level'], seed=config['seed'],device=device)
+            training_information, hessian_information  = train_network_configurations(Networks, x_train, y_train, train_dl, loss_func, m_L_config, 
+                                                                                    epochs, lrs, optimizer=config['optimizer'], 
+                                                                                    calc_cond_num=True, method_cond_num=config['method_cond_num'], calc_every_x_epoch=calc_every_x_epoch, 
+                                                                                    verbose_level=config['verbose_level'], seed=config['seed'],device=device)
             
             
             plot_diff_H_H_O_elementwise_during_training(hessian_information, filetitle=config['experiment_name'], hue_variable=hue_var, size_variable=size_var, file_path=file_path)
