@@ -300,7 +300,7 @@ def main(project_name, experiment_name, config):
             save_run(filename, x_train.cpu())
             
     elif config['dataset'] == 'mnist' or config['dataset'] == 'fashion':
-        x_train, y_train, x_val, y_val, x_test, y_test = load_mnist(config['dataset'] ,config['datapoints'], config['downsample_factor'], config['normalize_mnist'])
+        x_train, y_train, x_val, y_val, x_test, y_test = load_mnist(config['dataset'] ,config['datapoints'], config['downsample_factor'], config['normalize_mnist'], device=config['device'])
 
         
     train_dl, valid_dl = create_dataloaders(x_train, y_train, x_val, y_val, config['batch_size'])

@@ -15,7 +15,7 @@ def accuracy(out, yb):
     return (preds == yb).float().mean()
 
 
-def create_dataloaders(x_train, y_train, x_val, y_val, x_test, y_test, bs):
+def create_dataloaders(x_train, y_train, x_val, y_val, bs):
     '''
     create Torch.Dataloaders based on given train-, test- and validation-data
 
@@ -23,8 +23,6 @@ def create_dataloaders(x_train, y_train, x_val, y_val, x_test, y_test, bs):
     y_train: training labels
     x_val: validation input
     y_val: validation labels
-    x_test: test input
-    y_test: test labels
     bs: Batch size
     '''
 
@@ -34,10 +32,7 @@ def create_dataloaders(x_train, y_train, x_val, y_val, x_test, y_test, bs):
     valid_ds = TensorDataset(x_val, y_val)
     valid_dl = DataLoader(valid_ds, batch_size=bs)
     
-    test_ds = TensorDataset(x_test, y_test)
-    test_dl = DataLoader(test_ds, batch_size=bs)
-
-    return train_dl, valid_dl, test_dl
+    return train_dl, valid_dl
 
 def save_run(filename, x_train):
     '''

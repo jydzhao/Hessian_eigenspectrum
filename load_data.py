@@ -156,7 +156,7 @@ def load_cifar10(n, grayscale, flatten, whiten, device):
     return torch.tensor(x_train).to(device), y_train, torch.tensor(x_valid).to(device), y_valid
 
 
-def generate_gaussian_data_for_bin_classification(n, d, k, device, whiten):
+def generate_gaussian_data_for_bin_classification(n, d, k, whiten, seed, device):
     '''
     Generate bimodal Gaussian data for classification
     In the current implementation, the mean of both clusters is set to +/- the all-ones vector 
@@ -164,12 +164,16 @@ def generate_gaussian_data_for_bin_classification(n, d, k, device, whiten):
     The labels are also +/- the all-ones vector. However in the classification setting only k=1 makes really sense...
 
     n: number of samples
+    seed: seed for random number generator
     d: input dimension (dimension of the clusters)
     k: output dimension (number of classes, which is 2)
     seed:
     '''
     
     # rng = torch.random.manual_seed(seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    
 
     mean_1 = torch.ones((d,))
     mean_2 = -torch.ones((d,))
@@ -193,7 +197,7 @@ def generate_gaussian_data_for_bin_classification(n, d, k, device, whiten):
     y_data = torch.concatenate((y_class1,y_class2))
     
     # shuffle data
-    perm = torch.random.permutation(torch.arange(2*n))
+    perm = np.random.permutation(torch.arange(2*n))
     x_data = x_data[perm,:]
     y_data = y_data[perm]
     
