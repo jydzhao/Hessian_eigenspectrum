@@ -1,0 +1,108 @@
+###########
+# General #
+###########
+project_name: "trained_experiments" # baseline for synthetic experiments
+experiment_name: "FashionNOTWhitened"
+verbose_level: 0 
+calc_H_O_info : False
+calc_hess_info: True 
+calc_H: True
+log_yaml_file: True
+device: 'cpu'
+
+#########
+# Data #
+#########
+
+dataset: 'fashion'
+dataset_path: 'data/bimodal_gaussian/bimodal_gaussian_d=50_k=1_n=2000_whitened.npy'
+downsample_factor: 3
+datapoints: 5000
+whiten: False
+# Cifar-10 dataset
+grayscale: False
+flatten: True
+
+#########
+# Model #
+#########
+# possible models: sequential, lin_residual_network, sequential_w_fully_skip
+path: 'trained_models_new/'
+filenames: ['training_fashion_NOTwhitened_init=0_network_d=100_m=30_k=10_L=1_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=1_network_d=100_m=30_k=10_L=1_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=2_network_d=100_m=30_k=10_L=1_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=3_network_d=100_m=30_k=10_L=1_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=4_network_d=100_m=30_k=10_L=1_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=0_network_d=100_m=50_k=10_L=1_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=1_network_d=100_m=50_k=10_L=1_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=2_network_d=100_m=50_k=10_L=1_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=3_network_d=100_m=50_k=10_L=1_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=4_network_d=100_m=50_k=10_L=1_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=0_network_d=100_m=30_k=10_L=2_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=1_network_d=100_m=30_k=10_L=2_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=2_network_d=100_m=30_k=10_L=2_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=3_network_d=100_m=30_k=10_L=2_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=4_network_d=100_m=30_k=10_L=2_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=0_network_d=100_m=50_k=10_L=2_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=1_network_d=100_m=50_k=10_L=2_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=2_network_d=100_m=50_k=10_L=2_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=3_network_d=100_m=50_k=10_L=2_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=4_network_d=100_m=50_k=10_L=2_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=0_network_d=100_m=30_k=10_L=3_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=1_network_d=100_m=30_k=10_L=3_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=2_network_d=100_m=30_k=10_L=3_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=3_network_d=100_m=30_k=10_L=3_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=4_network_d=100_m=30_k=10_L=3_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=0_network_d=100_m=50_k=10_L=3_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=1_network_d=100_m=50_k=10_L=3_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=2_network_d=100_m=50_k=10_L=3_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=3_network_d=100_m=50_k=10_L=3_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=4_network_d=100_m=50_k=10_L=3_relu_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=0_network_d=100_m=30_k=10_L=1_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=1_network_d=100_m=30_k=10_L=1_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=2_network_d=100_m=30_k=10_L=1_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=3_network_d=100_m=30_k=10_L=1_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=4_network_d=100_m=30_k=10_L=1_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=0_network_d=100_m=50_k=10_L=1_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=1_network_d=100_m=50_k=10_L=1_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=2_network_d=100_m=50_k=10_L=1_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=3_network_d=100_m=50_k=10_L=1_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=4_network_d=100_m=50_k=10_L=1_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=0_network_d=100_m=30_k=10_L=2_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=1_network_d=100_m=30_k=10_L=2_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=2_network_d=100_m=30_k=10_L=2_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=3_network_d=100_m=30_k=10_L=2_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=4_network_d=100_m=30_k=10_L=2_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=0_network_d=100_m=50_k=10_L=2_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=1_network_d=100_m=50_k=10_L=2_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=2_network_d=100_m=50_k=10_L=2_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=3_network_d=100_m=50_k=10_L=2_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=4_network_d=100_m=50_k=10_L=2_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=0_network_d=100_m=30_k=10_L=3_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=1_network_d=100_m=30_k=10_L=3_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=2_network_d=100_m=30_k=10_L=3_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=3_network_d=100_m=30_k=10_L=3_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=4_network_d=100_m=30_k=10_L=3_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=0_network_d=100_m=50_k=10_L=3_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=1_network_d=100_m=50_k=10_L=3_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=2_network_d=100_m=50_k=10_L=3_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=3_network_d=100_m=50_k=10_L=3_linear_SGD_lr=0',
+            'training_fashion_NOTwhitened_init=4_network_d=100_m=50_k=10_L=3_linear_SGD_lr=0'
+           ]
+model_name: 'sequential'
+epoch_max: 2000
+every_epoch: 2000
+
+############
+# Analysis #
+############
+# method to calculate the condition number of the Hessian and outer product Hessian
+method_cond_num: 'naive'
+
+############# 
+# Optimizer #
+############# 
+loss_func: 'mse'
+max_iter: 100
+calc_every_iter: 10
+

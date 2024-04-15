@@ -1,66 +1,70 @@
 ###########
 # General #
 ###########
-project_name: "mnist_experiments" # baseline for synthetic experiments
-experiment_name: "effect_of_m_L_on_cond_H_O_more_layers"
-num_inits: 3
-max_epochs: 1000
-calc_every_iter: 100
+project_name: "experiments" # baseline for synthetic experiments
+experiment_name: "training"
+num_inits: 1
+max_epochs: 50000
+calc_every_iter: 20000
 verbose_level: 0 
 calc_cond_num: False
 save_model: True
-save_path: 'trained_models/'
+save_path: 'trained_models_new/'
+device: 'cuda'
 
 #########
 # Model #
 #########
-# possible models: sequential, sequential_w_fully_skip
+# possible models: sequential, sequential_w_fully_skip, lin_residual_network
 model_name: 'sequential'
-hidden_layers: [1]
-width: [110]
+hidden_layers: [3]
+width: [30]
+bias: False
 # possible activation functions: linear, relu, gelu, leaky_relu
-activation_func: 'linear'
+activation_func: 'relu'
+batch_norm: False
 # for leaky_relu:
-neg_slope: 0.5
+neg_slope: 0.01
 # for skip connections:
-beta: 1
+beta: 0.5
 seed: 314159
 
 ############
 # Analysis #
 ############
 # method to calculate the condition number of the Hessian and outer product Hessian
-method_cond_num: 'robust_cond_num'
+method_cond_num: 'naive'
 
 #########
 # Data #
 #########
 
-# possible choices: gaussian, mnist, fashion
+# possible choices: gaussian, mnist, fashion,cifar-10
 dataset: 'mnist'
-input_dim: 100 #[100] #needs to be adjusted accordingly (depending on downsample_factor) if using MNIST as dataset
+input_dim: 49 #[100] #needs to be adjusted accordingly (depending on downsample_factor) if using MNIST as dataset
 output_dim: 10 #[10]
+datapoints: 100
+whiten: True
 
-# synthetic bimodal gaussian dataset 
-data_pts_per_class_training: 1000
-data_pts_per_class_validation: 200
-data_pts_per_class_testing: 200
+# synthetic bimodal gaussian dataset (d=50, k=1, n=2000)
+
 
 # MNIST dataset
-downsample_factor: 3
-datapoints: 2000
-normalize_mnist: True
+downsample_factor: 4
 
+# Cifar-10 dataset
+grayscale: False
+flatten: True
 
 ############# 
 # Optimizer #
 ############# 
 loss_func: 'mse'
-# possible optims: sgd, adam
+# possible optims: SGD, Adam, Adagrad
 optimizer: 'SGD'
-batch_size: 200
-lr: [0.005]
-momentum: 0
+batch_size: 100
+# lr: [0.000001]
+lr: [2]
 weight_decay: 0.000
 
 ############

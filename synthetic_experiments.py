@@ -39,6 +39,8 @@ def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr,
         opt = optim.SGD(network.parameters(), lr=lr)
     elif optimizer == 'Adam':
         opt = optim.Adam(network.parameters(), lr=lr)
+    elif optimizer == 'Adagrad':
+        opt = optim.Adagrad(network.parameters(), lr=lr)
     else:
         ValueError('Unknown optimizer')    
     
@@ -49,15 +51,19 @@ def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr,
                                     'activ_f':[],
                                     'epoch':[],
                                     'loss':[],
-                                    'grad_norm_squared':[]
+                                    'acc':[],
+                                    'grad_norm_squared':[],
+                                    'full_grad_norm':[],
+                                    'dist_to_init':[],
                                     })
     
     initial_loss = loss_func(network(x_train), y_train)
     initial_loss.backward()
-    grad_norm_sq = sum([torch.linalg.norm(param.grad)**2 for param in network.parameters()])
+#     grad_norm_sq = sum([torch.linalg.norm(param.grad)**2 for param in network.parameters()])
+    
     opt.zero_grad()
 
-    training_information.loc[len(training_information)] = [network.width, network.depth, network.activation_func, 0, loss_func(network(x_train), y_train).cpu().detach(), grad_norm_sq.cpu().detach()]
+#     training_information.loc[len(training_information)] = [network.width, network.depth, network.activation_func, 0, loss_func(network(x_train), y_train).cpu().detach(), 0, 0, 0]
     
     if calc_cond_num == True:
         hessian_information = pd.DataFrame({ 
@@ -92,12 +98,17 @@ def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr,
                                                              _H_rank, _H_o_rank]
         
     print('Epoch: 0 \t loss= %10.3e' %loss_func(network(x_train), y_train).detach())
+    
+    weights_at_init = []
+    for param in network.parameters():
+        weights_at_init = np.append(weights_at_init, torch.flatten(param[1].detach().cpu()))
+ 
 
     for epoch in tqdm(range(epochs)):
         
         if save_model == True and epoch%calc_every_x_epoch==0:
             # print(network.lin_in.weight)
-            filename = (kwargs['save_path'] + 'network_' + 'd=%d_' + 'm=%d_' + 'k=%d_' + 'L=%d_' + '%s_' + '%s_' + '%s' + '_epoch=%s' + '.pt') % (network.input_dim, network.width, network.output_dim, network.depth, network.activation_func, optimizer, kwargs['dataset'], epoch)
+            filename = (kwargs['save_path'] + kwargs['experiment_name'] + '_network_' + 'd=%d_' + 'm=%d_' + 'k=%d_' + 'L=%d_' + '%s_' + '%s' + '_lr=%d' + '_epoch=%s' + '.pt') % (network.input_dim, network.width, network.output_dim, network.depth, network.activation_func, optimizer, lr, epoch)
             # model_scripted.save(filename)
             torch.save(network, filename)
         
@@ -121,8 +132,17 @@ def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr,
             loss.backward()
             
             grad_norm_sq = sum([torch.linalg.norm(param.grad)**2 for param in network.parameters()])
-
-            training_information.loc[len(training_information)] = [network.width, network.depth, network.activation_func, epoch, loss_func(network(x_train), y_train).cpu().detach(), grad_norm_sq.cpu().detach()]
+            
+            grad_vec = []
+            netw_weights = []
+            for param in network.parameters():
+                grad_vec = np.append(grad_vec,torch.flatten(param.grad.detach().cpu()))
+                netw_weights = np.append(netw_weights, torch.flatten(param[1].detach().cpu()))         
+            
+            acc = accuracy(network(x_train), y_train).cpu().detach()
+            
+            training_information.loc[len(training_information)] = [network.width, network.depth, network.activation_func, epoch, loss_func(network(x_train), y_train).cpu().detach(), acc, grad_norm_sq.cpu().detach(), np.linalg.norm(grad_vec), np.linalg.norm(netw_weights-weights_at_init)]
+            
             
             opt.step()
             opt.zero_grad()
@@ -136,16 +156,16 @@ def train_network(x_train, y_train, train_dl, loss_func, network, optimizer, lr,
         
         
         if verbose_level == 0 and epoch%int(epochs/10 + 1) ==0:
-            print('Epoch: %d \t loss= %10.4e' %(epoch+1, loss_func(network(x_train), y_train).detach()))
+            print('Epoch: %d \t loss= %10.4e \t acc= %10.4e' %(epoch+1, loss_func(network(x_train), y_train).cpu().detach(), accuracy(network(x_train),y_train)))
         elif verbose_level >= 1:
-            print('Epoch: %d \t loss= %10.4e' %(epoch+1, loss_func(network(x_train), y_train).detach()))
+            print('Epoch: %d \t loss= %10.4e \t acc= %10.4e' %(epoch+1, loss_func(network(x_train), y_train).cpu().detach(), accuracy(network(x_train),y_train)))
          
         
     print('Epoch: %d \t loss= %10.4e' %(epoch+1, loss_func(network(x_train), y_train).detach()))
 
     if save_model == True:
         # print(network.lin_in.weight)
-        filename = (kwargs['save_path'] + 'network_' + 'd=%d_' + 'm=%d_' + 'k=%d_' + 'L=%d_' + '%s_' + '%s_' + '%s_' + 'epoch=%s' + '.pt') % (network.input_dim, network.width, network.output_dim, network.depth, network.activation_func, optimizer, kwargs['dataset'], epoch)
+        filename = (kwargs['save_path'] +  kwargs['experiment_name'] +  '_network_' + 'd=%d_' + 'm=%d_' + 'k=%d_' + 'L=%d_' + '%s_' + '%s_' + 'lr=%d_' + 'epoch=%s' + '.pt') % (network.input_dim, network.width, network.output_dim, network.depth, network.activation_func, optimizer, lr, epoch)
         # model_scripted.save(filename)
         torch.save(network, filename)
         
@@ -201,12 +221,14 @@ def train_network_configurations(networks, x_train, y_train, train_dl, loss_func
 
 
     print('Training Networks...')
+    
+#     torch.manual_seed(seed)
 
     for ind, network in enumerate(networks):
 
         print('Network configuration: d=%d, k=%d, m=%d, L=%d' % (networks[0].lin_in.weight.shape[1], networks[0].lin_out.weight.shape[0], m_L_config[ind][0], m_L_config[ind][1]+1))
 
-        # torch.manual_seed(seed)
+        
 
         network.init_weights('kaiming_normal')
 
@@ -227,7 +249,8 @@ def train_network_configurations(networks, x_train, y_train, train_dl, loss_func
                                                 lr=lr, epochs=epochs, 
                                                 calc_cond_num=False,
                                                 verbose_level=verbose_level,
-                                                device=device, save_model=save_model, save_path= kwargs['save_path'], dataset= kwargs['dataset'])
+                                                calc_every_x_epoch=calc_every_x_epoch,
+                                                device=device, save_model=save_model, save_path= kwargs['save_path'], experiment_name = kwargs['experiment_name'])
             else:
                 _training_information = train_network(x_train, y_train, train_dl,
                                                 loss_func, network, 
@@ -235,6 +258,7 @@ def train_network_configurations(networks, x_train, y_train, train_dl, loss_func
                                                 lr=lr, epochs=epochs, 
                                                 calc_cond_num=False,
                                                 verbose_level=verbose_level,
+                                                calc_every_x_epoch=calc_every_x_epoch,
                                                 device=device)
             training_information = pd.concat([training_information, _training_information])
         else: 
@@ -269,40 +293,49 @@ def train_network_configurations(networks, x_train, y_train, train_dl, loss_func
 
 
 def main(project_name, experiment_name, config):
-
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
+    
+    torch.manual_seed(config['seed'])
+    
+    
+    if config['device'] == 'cuda':
+        device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
+    else:
+        device = torch.device('cpu')
+        
     print(device)
     print('Running experiment %s for project %s ' %(experiment_name, project_name))
 
     if config['dataset'] == 'gaussian':
-    # setting up Gaussian dataset
 
-        torch.manual_seed(config['seed'])
-
-        n = config['data_pts_per_class_training']
-        m = config['data_pts_per_class_validation']
-        v = config['data_pts_per_class_testing']
-        
-        d = config['input_dim']
-        k = config['output_dim']
-
-        x_train, y_train = generate_gaussian_data_for_bin_classification(n, d, k, config['whiten_gaussian'], config['seed'], device)
-        x_test, y_test = generate_gaussian_data_for_bin_classification(m, d, k, config['whiten_gaussian'], config['seed'], device)
-        x_val, y_val = generate_gaussian_data_for_bin_classification(v, d, k, config['whiten_gaussian'], config['seed'], device)
-        
-        if config['whiten_gaussian']:
-            filename = project_name + '_' + experiment_name + '_x_train' + 'whitened.npy'
-            save_run(filename, x_train.cpu())
-            
+        # save generated data
+        filepath = 'data/bimodal_gaussian/'
+        if config['whiten'] == True:
+            filename = 'bimodal_gaussian_d=50_k=1_n=2000_whitened.npy'
         else:
-            filename = project_name + '_' + experiment_name + '_x_train' + 'NOTwhitened.npy'
-            save_run(filename, x_train.cpu())
+            filename = 'bimodal_gaussian_d=50_k=1_n=2000_NOTwhitened.npy'
+
+        x_train, y_train, x_val, y_val = load_run(filepath+filename)
+
+        x_train = torch.tensor(x_train).to(device)
+        y_train = torch.tensor(y_train).to(device)
+        x_val   = torch.tensor(x_val).to(device)
+        y_val   = torch.tensor(y_val).to(device)
             
     elif config['dataset'] == 'mnist' or config['dataset'] == 'fashion':
-        x_train, y_train, x_val, y_val, x_test, y_test = load_mnist(config['dataset'] ,config['datapoints'], config['downsample_factor'], config['normalize_mnist'], device=config['device'])
-
+        x_train, y_train, x_val, y_val = load_mnist(config['dataset'], config['datapoints'], config['downsample_factor'], config['whiten'], device=device)
         
+        print(x_train.device)
+        
+    
+    elif config['dataset'] == 'cifar-10':
+        x_train, y_train, x_val, y_val = load_cifar10(config['datapoints'], config['grayscale'], config['flatten'], config['whiten'], device = device)
+        
+    if config['whiten']:
+            whiten = 'whitened'
+    else:
+        whiten = 'NOTwhitened'
+
+    print(x_train.shape, y_train.shape, x_val.shape, y_val.shape)
     train_dl, valid_dl = create_dataloaders(x_train, y_train, x_val, y_val, config['batch_size'])
 
     # calculate the empirical input covariance matrix and its condition number
@@ -323,6 +356,7 @@ def main(project_name, experiment_name, config):
     m1 = config['width']
     k = config['output_dim'] # output dimension
     activ_func = config['activation_func']
+    bias = config['bias'] # add bias term to layers
 
     L = np.array(config['hidden_layers'])-1 # number of hidden layers of dim "m"       
         
@@ -338,31 +372,45 @@ def main(project_name, experiment_name, config):
     print('Initiate networks...')
 
     # initiate networks of given depth L[l] with m1 hidden units each
+    # initiate networks of given depth L[l] with m hidden units each
     for m in m1:
         for l in L:
             m_L_config.append((m,l))
             if config['model_name'] == 'sequential':
 
                 if config['activation_func'] == 'leaky_relu':
-                    kwargs={'neg_slope': config['neg_slope'], 'batch_norm':config['batch_norm']} # negative slope of leaky ReLU
-                    Networks.append(Sequential_NN(d,m,k,l,'leaky_relu',**kwargs).to(device))
+                    kwargs={'neg_slope': config['neg_slope'], 'batch_norm': config['batch_norm']} # negative slope of leaky ReLU
+                    Networks.append(Sequential_NN(d,m,k,l,bias,'leaky_relu',**kwargs).to(device))
                 else:
-                    # print(d,m,k,l)
-                    # print(activ_func)
-                    kwargs={'batch_norm':config['batch_norm']}
-                    Networks.append(Sequential_NN(d,m,k,l,activ_func,**kwargs).to(device))
+                    kwargs={'batch_norm': config['batch_norm']}
+                    Networks.append(Sequential_NN(d,m,k,l,bias,activ_func, **kwargs).to(device))
             elif config['model_name'] == 'sequential_w_fully_skip':
+                if config['beta'] == '1/sqrt(L)':
+                    beta = 1/np.sqrt(l+1)
+                elif config['beta'] == '1/L':
+                    beta = 1/(l+1)
+                else:
+                    beta = config['beta']
                 if config['activation_func'] == 'leaky_relu':
                     kwargs={'neg_slope': config['neg_slope']} # negative slope of leaky ReLU
-                    Networks.append(Sequential_fully_skip_NN(d,m,k,l,beta=config['beta'],
+                    Networks.append(Sequential_fully_skip_NN(d,m,k,l,beta=beta,
                                                             activation=activ_func,**kwargs).to(device))
                 else: 
-                    Networks.append(Sequential_fully_skip_NN(d,m,k,l,beta=config['beta'],
-                                                            activation='linear').to(device))
+                    Networks.append(Sequential_fully_skip_NN(d,m,k,l,beta=beta,
+                                                            activation=activ_func).to(device))
+            elif config['model_name'] == 'lin_residual_network':
+                if config['beta'] == '1/sqrt(L)':
+                    beta = 1/np.sqrt(l+1)
+                elif config['beta'] == '1/L':
+                    beta = 1/(l+1)
+                else:
+                    beta = config['beta']
+                print('beta=',beta)
+                Networks.append(Linear_skip_single_layer_NN(d,m,k,l,beta=beta).to(device))
             else:
                 ValueError('Unknown model_name in config file')
 
-            num_param.append(sum(p.numel() for p in Sequential_fully_skip_NN(d,m,k,l).parameters()))
+            num_param.append(sum(p.numel() for p in Sequential_NN(d,m,k,l,bias=bias,**kwargs).parameters()))
             
     print('num parameters: ', num_param)
 
@@ -370,25 +418,31 @@ def main(project_name, experiment_name, config):
 
     epochs = config['max_epochs']
     calc_every_x_epoch = config['calc_every_iter']
+    print('calc_every_x_epoch',calc_every_x_epoch)
     # lrs = [0.02, 0.01, 0.01, 0.001, 0.0006, 0.0003] 
     lrs = config['lr']
-
+    
+    _experiment_name = config['experiment_name'] + '_' + config['dataset'] + '_' + whiten
+    
     if config['loss_func'] == 'mse':
         loss_func = F.mse_loss
 
     for i in range(config['num_inits']):
+        
+        experiment_name = f'{_experiment_name}_init={i}'
 
         if config['calc_cond_num'] == False:
             
-            if (config['dataset'] == 'mnist' or config['dataset'] == 'fashion') and config['normalize_mnist'] == True:
-                dataset = config['dataset'] + '_' + 'normalized_' + '%d' %i
-            else:
-                dataset = config['dataset'] + '_' + '%d' %i
+#             if (config['dataset'] == 'mnist' or config['dataset'] == 'fashion') and config['whiten'] == True:
+#                 dataset = config['dataset'] + '_' + 'whitened_' + '%d' %i
+#             else:
+#                 dataset = config['dataset'] + '_' + '%d' %i
 
             training_information = train_network_configurations(Networks, x_train, y_train, train_dl, loss_func, m_L_config, 
                                                                 epochs, lrs, optimizer=config['optimizer'], 
                                                                 calc_cond_num=False, calc_every_x_epoch=calc_every_x_epoch,
-                                                                verbose_level=config['verbose_level'], seed=config['seed'],device=device, save_model=config['save_model'], save_path=config['save_path'], dataset=dataset)
+                                                                verbose_level=config['verbose_level'], seed=config['seed'],device=device, save_model=config['save_model'], save_path=config['save_path'],
+                                                               experiment_name=experiment_name)
         else:
             training_information, hessian_information  = train_network_configurations(Networks, x_train, y_train, train_dl, loss_func, m_L_config, 
                                                                                     epochs, lrs, optimizer=config['optimizer'], 
@@ -415,12 +469,10 @@ def main(project_name, experiment_name, config):
                 yaml.dump(config, file)
 
 
-        
+        training_information.to_pickle(f"pandas_dataframes/training_information_{experiment_name}_d={config['input_dim']}_m={config['width']}_L={config['hidden_layers']}_{config['activation_func']}_{config['optimizer']}_lr={config['lr'][0]}.pkl")
 
-    training_information.to_pickle("pandas_dataframes/training_information_%s.pkl" %config['experiment_name'])
-
-    if config['calc_cond_num'] == True:
-        hessian_information.to_pickle("pandas_dataframes/hessian_information_%s.pkl" %config['experiment_name'])
+        if config['calc_cond_num'] == True:
+            hessian_information.to_pickle(f"pandas_dataframes/hessian_information_{experiment_name}_d={config['input_dim']}_m={config['width']}_L={config['hidden_layers']}_{config['activation_func']}_{config['optimizer']}_lr={config['lr'][0]}.pkl")
 
 
 if __name__ == '__main__':

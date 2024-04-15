@@ -109,6 +109,10 @@ def compute_jacobian(model, x):
         jac = torch.autograd.functional.jacobian(lambda param: param_as_input_func(jac_model, x, param), param,
                              strict=True if i==0 else False, vectorize=False if i==0 else True)
 
+#         print(jac.shape)
+        
+        jac = torch.unsqueeze(jac,0)
+        
         n = jac.shape[0]
         k = jac.shape[1]
         if len(jac.shape) == 4:
@@ -119,6 +123,8 @@ def compute_jacobian(model, x):
             jacobian = j
         else:
             jacobian = torch.cat([jacobian,j],dim=2)
+            
+            
 #     print(jacobian.shape)        
 
     del jac_model # cleaning up
@@ -145,19 +151,25 @@ def calc_hessian(network,x,y,loss_func,device):
     loss = loss_func(y_hat,y)
     
     num_param = sum(p.numel() for p in network.parameters())
-
+    
+    print('Calculating Hessian...')
     # Allocate Hessian size
     H = torch.zeros((num_param, num_param))
 
     # Calculate Jacobian w.r.t. model parameters
     J = torch.autograd.grad(loss, list(network.parameters()), create_graph=True)
     J = torch.cat([e.flatten() for e in J]) # flatten
-
+    
+    print('Filling in Hessian...')
     # Fill in Hessian
     for i in range(num_param):
         result = torch.autograd.grad(J[i], list(network.parameters()), retain_graph=True)
         H[i] = torch.cat([r.flatten() for r in result]) # flatten
                 
+    print('Finished calculating Hessian...')
+    
+    H = 5*H #???
+    
     H_spectrum = torch.linalg.eigvalsh(H.detach())
     # H_rank = torch.linalg.matrix_rank(H.detach(), atol=1e-7/H.shape[0])
     
@@ -176,33 +188,38 @@ def calc_outer_prod_hessian(network,x):
     x: input samples
     '''
     
-    print('Calculating Jacobian...')
-    jacob = compute_jacobian(network,x)
-
-    jacob = jacob.detach()
-    print('Finished calculating Jacobian...')
+    print('Calculating H_O...')
     
-    # print(jacob.shape)
-    n=jacob.shape[0]
+#     print(x.shape)
+#     print(jacob.shape)
+    n=x.shape[0]
+    
+    num_param = sum([len(param.flatten()) for param in network.parameters()])
 
-    jac_jac_T = torch.zeros(jacob.shape[2],jacob.shape[2])
+    jac_jac_T = torch.zeros(num_param, num_param)
 
     for i in range(n):
+        
+        jacob = compute_jacobian(network,x[i,:]).detach()
+        
+#         print(jacob.shape)
                 
-        jac_jac_T += jacob[i,:,:].T @ jacob[i,:,:]
+        jac_jac_T += jacob[0,:,:].T @ jacob[0,:,:]
 
     del jacob
     
-    # arr = [jacob[i,:,:].T @ jacob[i,:,:] for i in range(n)]
-    jac_jac_T = 2*jac_jac_T/n
+    jac_jac_T = jac_jac_T/n
+    
     
 #     jac_jac_T_rank = torch.linalg.matrix_rank(jac_jac_T, atol=1e-7/jac_jac_T.shape[0])
     # jac_jac_T_rank = torch.linalg.matrix_rank(jac_jac_T, atol=1e-7/jac_jac_T.shape[0])
     
     jac_jac_T_spectrum = torch.linalg.eigvalsh(jac_jac_T) #[-jac_jac_T_rank:]
+    jac_jac_T_spectrum = np.sort(np.abs(jac_jac_T_spectrum))
 
     jac_jac_T = jac_jac_T
     
+    print('Finished calculating H_O and spectrum ...')
     
     
     return jac_jac_T, jac_jac_T_spectrum
@@ -214,9 +231,16 @@ def calc_condition_num(network,x,y,loss,device,calc_H,method='naive'):
     Calculates the condition number of the full Hessian the outer-product Hessian and the extreme eigenvalues of 
     the full Hessian given a Neural network, the loss function and input & output data
     '''
+    
 
     # calculate the outer-product Hessian, its spectrum 
     H_o, H_o_spectrum = calc_outer_prod_hessian(network,x)
+    
+#     with open('eigval_H_O_pytorch.npy', 'wb') as f:
+#         np.save(f, H_o_spectrum)
+        
+#     with open('H_O_pytorch.npy', 'wb') as f:
+#             np.save(f, H_o)
     
     if calc_H == True:
         H_full, H_spectrum = calc_hessian(network,x,y,loss,device)
@@ -225,19 +249,30 @@ def calc_condition_num(network,x,y,loss,device,calc_H,method='naive'):
         mean_diff_H_H_o = (torch.norm(H_full-H_o)/H_full.shape[0]**2)
         max_diff_H_H_o = torch.max(H_full-H_o)
         std_diff_H_H_o = torch.std(H_full-H_o)
+        
+        print('diff=',torch.linalg.norm(H_full-H_o))
+        
+#         print(H_o.shape, H_full.shape)
+#         print(f'H_O: {H_o_spectrum}')
+#         print(f'H: {abs_spectrum_sorted}')
+        
+        
+        
     
 #     print('H_rank= ', H_rank)
 
-    
+        print('Finished calculating H...')
 
     if method == 'naive':
 
         # calculate the full Hessian rank outer-product Hessian rank using the matrix_rank() function
         if calc_H == True:
-            H_rank = int(torch.linalg.matrix_rank( H_full, atol=1e-7/H_full.shape[0]))
+            H_rank = int(torch.linalg.matrix_rank( H_full, rtol=1e-6)) #1e-8 for Fashion L=2, 1e-8/H_full.shape[0] for MNIST L=2 
             
         H_o_rank = int(torch.linalg.matrix_rank(H_o, atol=1e-7/H_o.shape[0])) 
-
+        
+#         H_o_rank = 490
+        
     elif method == 'stable_matrix_rank':
 
         # calculate the full Hessian rank outer-product Hessian rank using the stable rank (also called numerical rank): https://arxiv.org/abs/math/0503442v3, https://math.stackexchange.com/questions/1844842/properties-of-matrix-stable-numerical-rank
@@ -262,6 +297,8 @@ def calc_condition_num(network,x,y,loss,device,calc_H,method='naive'):
             
         H_o_rank = int(torch.linalg.matrix_rank(H_o, atol=1e-7/H_o.shape[0]))
         H_o_rank = int(H_o_rank/2)
+        
+
     
     else: 
         ValueError('Unknown method specified to calculate the condition number.')
@@ -274,7 +311,7 @@ def calc_condition_num(network,x,y,loss,device,calc_H,method='naive'):
         lam_abs_min_H_o = ( (H_o_spectrum[-H_o_rank] + H_o_spectrum[-H_o_rank-1])/2 )
     else:
         if calc_H == True:
-            lam_abs_min_H = (abs_spectrum_sorted[-H_rank])   
+            lam_abs_min_H = (abs_spectrum_sorted[-H_rank])
             
         lam_abs_min_H_o = (H_o_spectrum[-H_o_rank])
 
@@ -290,8 +327,15 @@ def calc_condition_num(network,x,y,loss,device,calc_H,method='naive'):
     
     del H_o
     
+    print(H_o_cond, H_cond)
+    
+#     matplotlib.pyplot.hist(np.log(H_o_spectrum[max(-H_full.shape[0]+1,-(H_o_rank)):]), bins=10, label='H_o', alpha=0.5)
+#     matplotlib.pyplot.hist(np.log(abs_spectrum_sorted[max(-H_full.shape[0]+1,-(H_rank)):]), bins=10, label='H', alpha=0.5)
+#     matplotlib.pyplot.legend()
+#     matplotlib.pyplot.savefig('test.pdf', bbox_inches='tight')
+    
     if calc_H == True:
-        return H_cond, H_o_cond.cpu(), lam_abs_min_H, lam_abs_max_H, lam_abs_min_H_o.cpu(), lam_abs_max_H_o.cpu(), mean_diff_H_H_o.cpu(), max_diff_H_H_o.cpu(), std_diff_H_H_o.cpu(), H_rank, H_o_rank
+        return H_cond, H_o_cond, lam_abs_min_H, lam_abs_max_H, lam_abs_min_H_o, lam_abs_max_H_o, mean_diff_H_H_o.cpu(), max_diff_H_H_o.cpu(), std_diff_H_H_o.cpu(), H_rank, H_o_rank, abs_spectrum_sorted, H_o_spectrum
     else:
         return H_o_cond.cpu(), lam_abs_min_H_o.cpu(), lam_abs_max_H_o.cpu(), H_o_rank
 
